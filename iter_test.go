@@ -2,11 +2,11 @@ package xiter_test
 
 import (
 	"context"
-	. "github.com/adracus/xiter"
 	"maps"
 	"math/rand"
 	"reflect"
 	"slices"
+	. "spheric.cloud/xiter"
 	"strconv"
 	"testing"
 )
