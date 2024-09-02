@@ -1,14 +1,20 @@
+// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and Spheric contributors
+// SPDX-License-Identifier: Apache-2.0
+
 package xiter_test
 
 import (
 	"context"
+	"fmt"
+	"iter"
 	"maps"
 	"math/rand"
 	"reflect"
 	"slices"
-	. "spheric.cloud/xiter"
 	"strconv"
 	"testing"
+
+	. "spheric.cloud/xiter"
 )
 
 func AbsMod(n int, cap int) int {
@@ -20,17 +26,6 @@ func Abs(n int) int {
 		return n * -1
 	}
 	return n
-}
-
-func MkYield0(calls *int, n int) func() bool {
-	return func() bool {
-		*calls++
-
-		if n < 0 {
-			return true
-		}
-		return *calls < n
-	}
 }
 
 func MkYield[V any](elems *[]V, n int) func(V) bool {
@@ -55,16 +50,6 @@ func MkYield2[K, V any](elems *[]any, n int) func(K, V) bool {
 	}
 }
 
-func MkSeq0(calls *int, n int) Seq0 {
-	return func(yield func() bool) {
-		for *calls = 0; *calls < n; *calls++ {
-			if !yield() {
-				return
-			}
-		}
-	}
-}
-
 func MkRandSlice(n int) []int {
 	res := make([]int, n)
 	for i := 0; i < n; i++ {
@@ -82,11 +67,11 @@ func MkRandKVSlice(n int) []any {
 	return res
 }
 
-func MkRandSeq(n int) Seq[int] {
+func MkRandSeq(n int) iter.Seq[int] {
 	return OfSlice(MkRandSlice(n))
 }
 
-func MkRandSeq2(n int) Seq2[int, int] {
+func MkRandSeq2(n int) iter.Seq2[int, int] {
 	return OfKVSlice[int, int](MkRandKVSlice(n))
 }
 
@@ -111,46 +96,6 @@ func EqualIgnoreOrder[V any](s1, s2 []V) bool {
 	}
 	return true
 }
-func TestConcat0(t *testing.T) {
-	testCases := []struct {
-		name   string
-		ns     []int
-		yieldN int
-		want   int
-	}{
-		{"empty seq", []int{}, -1, 0},
-		{"single seq", []int{4}, -1, 4},
-		{"multiple seqs", []int{4, 3}, -1, 7},
-		{"multiple seqs early return", []int{4, 3}, 5, 5},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			seqCalls := make([]int, len(tc.ns))
-			seqs := make([]Seq0, len(tc.ns))
-			for i := 0; i < len(tc.ns); i++ {
-				seqs[i] = MkSeq0(&seqCalls[i], tc.ns[i])
-			}
-			seq := Concat0(seqs...)
-
-			var ans int
-			yield := MkYield0(&ans, tc.yieldN)
-			seq(yield)
-
-			if ans != tc.want {
-				t.Errorf("got %d calls, expected %d", ans, tc.want)
-			}
-
-			for i := 0; ans > 0 && i < len(seqCalls); i++ {
-				wantCalls := min(ans, seqCalls[i])
-				if seqCalls[i] != wantCalls {
-					t.Errorf("seq %d got %d calls, expected %d", i, seqCalls[i], wantCalls)
-				}
-
-				ans = ans - wantCalls
-			}
-		})
-	}
-}
 
 func TestConcat(t *testing.T) {
 	testCases := []struct {
@@ -166,7 +111,7 @@ func TestConcat(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			seqs := make([]Seq[int], len(tc.ss))
+			seqs := make([]iter.Seq[int], len(tc.ss))
 			for i := 0; i < len(tc.ss); i++ {
 				seqs[i] = OfSlice(tc.ss[i])
 			}
@@ -197,7 +142,7 @@ func TestConcat2(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			seqs := make([]Seq2[string, int], len(tc.ss))
+			seqs := make([]iter.Seq2[string, int], len(tc.ss))
 
 			for i := 0; i < len(tc.ss); i++ {
 				seqs[i] = OfKVSlice[string, int](tc.ss[i])
@@ -262,158 +207,6 @@ func FuzzOfSlice(f *testing.F) {
 
 		if !slices.Equal(s, res) {
 			t.Errorf("Expected slice %v but got %v", s, res)
-		}
-	})
-}
-
-func TestPull0(t *testing.T) {
-	testCases := []struct {
-		name  string
-		n     int
-		stopN int
-		want  int
-	}{
-		{"no elems", 0, -1, 0},
-		{"ten elems", 10, -1, 10},
-		{"stop early", 10, 5, 5},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			var ans int
-			next, stop := Pull0(MkSeq0(&ans, tc.n))
-			defer stop()
-
-			for {
-				if tc.stopN != -1 && tc.stopN == ans {
-					stop()
-				}
-
-				if !next() {
-					break
-				}
-			}
-
-			if ans != tc.want {
-				t.Errorf("got %d calls, expected %d", ans, tc.want)
-			}
-		})
-	}
-}
-
-func TestPull(t *testing.T) {
-	testCases := []struct {
-		name  string
-		s     []int
-		stopN int
-		want  []int
-	}{
-		{"no elems", []int{}, -1, []int{}},
-		{"some elems", []int{1, 2, 3}, -1, []int{1, 2, 3}},
-		{"stop early", []int{1, 2, 3}, 2, []int{1, 2}},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			var ans []int
-			next, stop := Pull(OfSlice(tc.s))
-			defer stop()
-
-			for {
-				if tc.stopN != -1 && tc.stopN == len(ans) {
-					stop()
-				}
-
-				v, ok := next()
-				if !ok {
-					break
-				}
-
-				ans = append(ans, v)
-			}
-
-			if !slices.Equal(ans, tc.want) {
-				t.Errorf("got %v, expected %v", ans, tc.want)
-			}
-		})
-	}
-}
-
-func TestPull2(t *testing.T) {
-	testCases := []struct {
-		name  string
-		s     []any
-		stopN int
-		want  []any
-	}{
-		{"no elems", []any{}, -1, []any{}},
-		{"some elems", []any{"foo", 1, "bar", 2, "baz", 3}, -1, []any{"foo", 1, "bar", 2, "baz", 3}},
-		{"stop early", []any{"foo", 1, "bar", 2, "baz", 3}, 2, []any{"foo", 1, "bar", 2}},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			var ans []any
-			next, stop := Pull2(OfKVSlice[string, int](tc.s))
-			defer stop()
-
-			for {
-				if tc.stopN != -1 && tc.stopN*2 == len(ans) {
-					stop()
-				}
-
-				k, v, ok := next()
-				if !ok {
-					break
-				}
-
-				ans = append(ans, k, v)
-			}
-
-			if !slices.Equal(ans, tc.want) {
-				t.Errorf("got %v, expected %v", ans, tc.want)
-			}
-		})
-	}
-}
-
-func FuzzZip0(f *testing.F) {
-	testCases := []struct {
-		n1, n2 int
-	}{
-		{3, 3},
-		{0, 0},
-		{1, 3},
-		{3, 1},
-	}
-	for _, tc := range testCases {
-		f.Add(tc.n1, tc.n2)
-	}
-
-	f.Fuzz(func(t *testing.T, n1, n2 int) {
-		if n1 < 0 || n2 < 0 {
-			t.Skip()
-		}
-
-		n1 %= 20
-		n2 %= 20
-		n := max(n1, n2)
-
-		for i := 0; i < n; i++ {
-			seq := Zip0(MkSeq0(new(int), n1), MkSeq0(new(int), n2))
-			if i != n-1 {
-				seq = Take(i, seq)
-			}
-
-			ans := ToSlice(seq)
-			for i := 0; i < len(ans); i++ {
-				wantOk1 := i < n1
-				if ans[i].Ok1 != wantOk1 {
-					t.Errorf("got %t for ok1 %d but expected %t", ans[i].Ok1, i, wantOk1)
-				}
-
-				wantOk2 := i < n2
-				if ans[i].Ok2 != wantOk2 {
-					t.Errorf("got %t for ok2 %d but expected %t", ans[i].Ok2, i, wantOk2)
-				}
-			}
 		}
 	})
 }
@@ -538,8 +331,8 @@ func FuzzZip2(f *testing.F) {
 func TestZip2(t *testing.T) {
 	testCases := []struct {
 		name string
-		s1   Seq2[string, int]
-		s2   Seq2[string, int]
+		s1   iter.Seq2[string, int]
+		s2   iter.Seq2[string, int]
 		want []Zipped2[string, int, string, int]
 	}{
 		{
@@ -571,29 +364,6 @@ func TestZip2(t *testing.T) {
 	}
 }
 
-func TestEqual0(t *testing.T) {
-	testCases := []struct {
-		name   string
-		n1, n2 int
-		want   bool
-	}{
-		{"both empty", 0, 0, true},
-		{"equal length", 4, 4, true},
-		{"non-equal length", 2, 4, false},
-		{"non-equal length", 4, 2, false},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			s1 := MkSeq0(new(int), tc.n1)
-			s2 := MkSeq0(new(int), tc.n2)
-			ans := Equal0(s1, s2)
-			if ans != tc.want {
-				t.Errorf("got %t, expected %t", ans, tc.want)
-			}
-		})
-	}
-}
-
 func TestEqual(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -620,7 +390,7 @@ func TestEqual(t *testing.T) {
 func TestEqual2(t *testing.T) {
 	testCases := []struct {
 		name   string
-		s1, s2 Seq2[string, int]
+		s1, s2 iter.Seq2[string, int]
 		want   bool
 	}{
 		{"Equal", OfKVs[string, int]("foo", 1), OfKVs[string, int]("foo", 1), true},
@@ -642,7 +412,7 @@ func TestEqual2(t *testing.T) {
 func TestEqualFunc(t *testing.T) {
 	testCases := []struct {
 		name   string
-		s1, s2 Seq[int]
+		s1, s2 iter.Seq[int]
 		f      func(int, int) bool
 		want   bool
 	}{
@@ -678,7 +448,7 @@ func TestEqualFunc(t *testing.T) {
 func TestEqualFunc2(t *testing.T) {
 	testCases := []struct {
 		name   string
-		s1, s2 Seq2[int, int]
+		s1, s2 iter.Seq2[int, int]
 		f      func(int, int, int, int) bool
 		want   bool
 	}{
@@ -973,31 +743,6 @@ func TestContainsFunc2(t *testing.T) {
 	}
 }
 
-func FuzzTake0(f *testing.F) {
-	testCases := []int{
-		0, 1, 3, 5,
-	}
-	for _, tc := range testCases {
-		f.Add(tc)
-	}
-	f.Fuzz(func(t *testing.T, n int) {
-		n = AbsMod(n, 20)
-		var l int
-		if n > 0 {
-			l = rand.Intn(n)
-		}
-
-		var calls int
-		seq := MkSeq0(&calls, n)
-
-		Drain0(Take0(l, seq))
-
-		if calls != l {
-			t.Errorf("got %d calls, expected %d", calls, l)
-		}
-	})
-}
-
 func FuzzTake(f *testing.F) {
 	testCases := []int{
 		0, 1, 3, 5,
@@ -1052,8 +797,8 @@ func TestTakeWhile(t *testing.T) {
 	tests := []struct {
 		name     string
 		f        func(int) bool
-		seq      Seq[int]
-		expected Seq[int]
+		seq      iter.Seq[int]
+		expected iter.Seq[int]
 	}{
 		{
 			name:     "Empty sequence",
@@ -1095,8 +840,8 @@ func TestTakeWhile2(t *testing.T) {
 	tests := []struct {
 		name     string
 		f        func(string, int) bool
-		seq      Seq2[string, int]
-		expected Seq2[string, int]
+		seq      iter.Seq2[string, int]
+		expected iter.Seq2[string, int]
 	}{
 		{
 			name:     "Empty sequence",
@@ -1347,7 +1092,7 @@ func TestMap2(t *testing.T) {
 
 func TestFlatmap(t *testing.T) {
 	seq := []int{1, 2, 3, 4}
-	ans := ToSlice(Flatmap(func(i int) Seq[int] {
+	ans := ToSlice(Flatmap(func(i int) iter.Seq[int] {
 		return Of(i, i*i)
 	}, OfSlice(seq)))
 	want := []int{1, 1, 2, 4, 3, 9, 4, 16}
@@ -1358,7 +1103,7 @@ func TestFlatmap(t *testing.T) {
 
 func TestFlatmap2(t *testing.T) {
 	seq := []any{"a", 1, "b", 2, "c", 3, "d", 4}
-	ans := ToKVSlice(Flatmap2(func(s string, i int) Seq2[string, int] {
+	ans := ToKVSlice(Flatmap2(func(s string, i int) iter.Seq2[string, int] {
 		return OfKVs[string, int](s, i*i)
 	}, OfKVSlice[string, int](seq)))
 	want := []any{"a", 1, "b", 4, "c", 9, "d", 16}
@@ -1368,7 +1113,7 @@ func TestFlatmap2(t *testing.T) {
 }
 
 func TestFlatten(t *testing.T) {
-	seq := []Seq[int]{Of(1, 2), Of(3, 4)}
+	seq := []iter.Seq[int]{Of(1, 2), Of(3, 4)}
 	ans := ToSlice(Flatten(OfSlice(seq)))
 	want := []int{1, 2, 3, 4}
 	if !slices.Equal(ans, want) {
@@ -1377,7 +1122,7 @@ func TestFlatten(t *testing.T) {
 }
 
 func TestFlatten2(t *testing.T) {
-	seq := []Seq2[int, int]{OfKVs[int, int](1, 2), OfKVs[int, int](3, 4)}
+	seq := []iter.Seq2[int, int]{OfKVs[int, int](1, 2), OfKVs[int, int](3, 4)}
 	ans := ToKVSlice(Flatten2(OfSlice(seq)))
 	want := []any{1, 2, 3, 4}
 	if !slices.Equal(ans, want) {
@@ -1486,10 +1231,12 @@ func TestRepeat2(t *testing.T) {
 }
 
 func TestCache(t *testing.T) {
-	seq := Cache(Of(1, 2))
-	want := []int{1, 2}
+	seq, stop := Cache(Of(1, 2))
+	defer stop()
 
+	want := []int{1, 2}
 	ans := ToSlice(seq)
+
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
 	}
@@ -1501,7 +1248,10 @@ func TestCache(t *testing.T) {
 }
 
 func TestCycle(t *testing.T) {
-	ans := ToSlice(Take(5, Cycle(Of(1, 2))))
+	c, stop := Cycle(Of(1, 2))
+	defer stop()
+
+	ans := ToSlice(Take(5, c))
 	want := []int{1, 2, 1, 2, 1}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1509,8 +1259,12 @@ func TestCycle(t *testing.T) {
 }
 
 func TestCycle2(t *testing.T) {
-	ans := ToKVSlice(Take2(5, Cycle2(OfKVs[string, int]("a", 1, "b", 2))))
+	c, stop := Cycle2(OfKVs[string, int]("a", 1, "b", 2))
+	defer stop()
+
+	ans := ToKVSlice(Take2(5, c))
 	want := []any{"a", 1, "b", 2, "a", 1, "b", 2, "a", 1}
+
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
 	}
@@ -1686,23 +1440,6 @@ func TestCount2(t *testing.T) {
 	if ans != want {
 		t.Errorf("got %d, want %d", ans, want)
 	}
-}
-
-func FuzzLen0(f *testing.F) {
-	testCases := []int{
-		0, 1, 3, 5,
-	}
-	for _, tc := range testCases {
-		f.Add(tc)
-	}
-	f.Fuzz(func(t *testing.T, n int) {
-		n = AbsMod(n, 20)
-		seq := MkSeq0(new(int), n)
-		ans := Len0(seq)
-		if ans != n {
-			t.Errorf("got %d, expected %d", ans, n)
-		}
-	})
 }
 
 func FuzzLen(f *testing.F) {
@@ -1923,12 +1660,6 @@ func TestOfNext2(t *testing.T) {
 	}
 }
 
-func TestEmpty0(t *testing.T) {
-	if Len0(Empty0()) != 0 {
-		t.Errorf("Empty0 not empty")
-	}
-}
-
 func TestEmpty(t *testing.T) {
 	if Len(Empty[int]()) != 0 {
 		t.Errorf("Empty not empty")
@@ -2005,5 +1736,112 @@ func TestToSliceMap(t *testing.T) {
 	want := map[string][]int{"a": {1}, "b": {2}, "c": {3, 3}}
 	if !reflect.DeepEqual(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
+	}
+}
+
+func TestTryCollect(t *testing.T) {
+	type args[K any] struct {
+		it iter.Seq2[K, error]
+	}
+	type testCase[K any] struct {
+		name    string
+		args    args[K]
+		want    []K
+		wantErr bool
+	}
+	tests := []testCase[string]{
+		{
+			name: "no error",
+			args: args[string]{
+				it: Merge[string, error](Of("foo", "bar"), Of[error](nil, nil)),
+			},
+			want:    []string{"foo", "bar"},
+			wantErr: false,
+		},
+		{
+			name: "first error wins",
+			args: args[string]{
+				it: Merge[string, error](Of("foo", "", "bar"), Of[error](nil, fmt.Errorf("error"), nil)),
+			},
+			want:    []string{"foo"},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := TryCollect(tt.args.it)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TryCollect() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("TryCollect() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeparate(t *testing.T) {
+	type args[K any, V any] struct {
+		seq iter.Seq2[K, V]
+	}
+	type testCase[K any, V any] struct {
+		name   string
+		args   args[K, V]
+		wantKs []K
+		wantVs []V
+	}
+	tests := []testCase[string, int]{
+		{
+			name: "some strings and ints",
+			args: args[string, int]{
+				seq: OfKVs[string, int]("foo", 1, "bar", 2),
+			},
+			wantKs: []string{"foo", "bar"},
+			wantVs: []int{1, 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			seq1, seq2, stop := Separate(tt.args.seq)
+			defer stop()
+
+			ks := ToSlice(seq1)
+			vs := ToSlice(seq2)
+
+			if !reflect.DeepEqual(ks, tt.wantKs) {
+				t.Errorf("Separate() ks = %v, want %v", ks, tt.wantKs)
+			}
+			if !reflect.DeepEqual(vs, tt.wantVs) {
+				t.Errorf("Separate() vs = %v, want %v", vs, tt.wantVs)
+			}
+		})
+	}
+}
+
+func TestSeparatePartial(t *testing.T) {
+	kSeq, vSeq, stop := Separate(OfKVs[string, int]("foo", 1, "bar", 2))
+	defer stop()
+
+	k := ToSlice(Take(1, kSeq))
+	vs := ToSlice(vSeq)
+
+	wantK := []string{"foo"}
+	if !reflect.DeepEqual(k, wantK) {
+		t.Errorf("Separate() ks = %v, want %v", k, wantK)
+	}
+
+	wantVs := []int{1, 2}
+	if !reflect.DeepEqual(vs, wantVs) {
+		t.Errorf("Separate() vs = %v, want %v", vs, wantVs)
+	}
+}
+
+func TestMerge(t *testing.T) {
+	res := ToSlice2(Merge(Of(1, 2, 3, 4), Of(11, 12, 13, 14, 15)))
+	want := []int{1, 11, 2, 12, 3, 13, 4, 14}
+
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("Merge() res = %v, want %v", res, want)
 	}
 }
