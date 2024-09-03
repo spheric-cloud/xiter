@@ -848,6 +848,98 @@ func TryMapErr[In, Out any](f func(In) (Out, error), seq iter.Seq2[In, error]) i
 	}
 }
 
+// TryFilter filters non-error tuples with the given predicate function.
+// For error-tuples, the filter is not applied and yield is called with the error and the value.
+func TryFilter[K any](f func(K) bool, seq iter.Seq2[K, error]) iter.Seq2[K, error] {
+	return func(yield func(K, error) bool) {
+		for v, err := range seq {
+			if err != nil {
+				if !yield(v, err) {
+					return
+				}
+
+				continue
+			}
+
+			if !f(v) {
+				continue
+			}
+
+			if !yield(v, nil) {
+				return
+			}
+		}
+	}
+}
+
+// TryMap maps non-error tuples with the given function.
+// For error-tuples, the function is not applied and yield is called with the error and the zero Out value.
+func TryMap[In, Out any](f func(In) Out, seq iter.Seq2[In, error]) iter.Seq2[Out, error] {
+	return func(yield func(Out, error) bool) {
+		for v, err := range seq {
+			if err != nil {
+				var zero Out
+				if !yield(zero, err) {
+					return
+				}
+
+				continue
+			}
+
+			out := f(v)
+			if !yield(out, nil) {
+				return
+			}
+		}
+	}
+}
+
+// TryFlatmap maps non-error tuples with the given function, flattening the result.
+// For error-tuples, the function is not applied and yield is called with the error and the zero Out value.
+func TryFlatmap[In, Out any](f func(In) iter.Seq[Out], seq iter.Seq2[In, error]) iter.Seq2[Out, error] {
+	return func(yield func(Out, error) bool) {
+		for v, err := range seq {
+			if err != nil {
+				var zero Out
+				if !yield(zero, err) {
+					return
+				}
+
+				continue
+			}
+
+			for out := range f(v) {
+				if !yield(out, nil) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// TryFlatmapErr maps non-error tuples with the given function, flattening the result.
+// For error-tuples, the function is not applied and yield is called with the error and the zero Out value.
+func TryFlatmapErr[In, Out any](f func(In) iter.Seq2[Out, error], seq iter.Seq2[In, error]) iter.Seq2[Out, error] {
+	return func(yield func(Out, error) bool) {
+		for v, err := range seq {
+			if err != nil {
+				var zero Out
+				if !yield(zero, err) {
+					return
+				}
+
+				continue
+			}
+
+			for out, err := range f(v) {
+				if !yield(out, err) {
+					return
+				}
+			}
+		}
+	}
+}
+
 func TryCollect[K any](it iter.Seq2[K, error]) ([]K, error) {
 	var res []K
 	for k, err := range it {

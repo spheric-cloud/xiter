@@ -1866,3 +1866,71 @@ func TestTryMapErr(t *testing.T) {
 		t.Errorf("TryMapErr() res = %v, want %v", res, want)
 	}
 }
+
+func TestTryFilter(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	seq := Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))
+	res := ToKVSlice(TryFilter(func(i int) bool {
+		return i <= 2
+	}, seq))
+
+	want := []any{1, (error)(nil), 2, fooErr}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryFilter() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryMap(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	seq := Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))
+	res := ToKVSlice(TryMap(func(i int) string {
+		return strconv.Itoa(i)
+	}, seq))
+
+	want := []any{"1", (error)(nil), "", fooErr, "3", nil}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryMap() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryFlatmap(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	seq := Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))
+	res := ToKVSlice(TryFlatmap(func(i int) iter.Seq[string] {
+		return Of(strconv.Itoa(i))
+	}, seq))
+
+	want := []any{"1", (error)(nil), "", fooErr, "3", nil}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryFlatmap() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryFlatmapErr(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+		barErr = errors.New("bar")
+	)
+
+	seq := Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))
+	res := ToKVSlice(TryFlatmapErr(func(i int) iter.Seq2[string, error] {
+		if i > 2 {
+			return OfKVs[string, error]("", barErr)
+		}
+		return Merge(Of(strconv.Itoa(i)), Of((error)(nil)))
+	}, seq))
+
+	want := []any{"1", (error)(nil), "", fooErr, "", barErr}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryFlatmapErr() res = %v, want %v", res, want)
+	}
+}
