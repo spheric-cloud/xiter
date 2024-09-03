@@ -828,6 +828,26 @@ func MapErr[In, Out any](f func(In) (Out, error), seq iter.Seq[In]) iter.Seq2[Ou
 	return MapLift[In, Out, error](f, seq)
 }
 
+// TryMapErr applies the transformation function f to each non-error tuple of the given sequence.
+// For error-tuples, the function is not applied and yield is called with the error and the zero value of Out.
+func TryMapErr[In, Out any](f func(In) (Out, error), seq iter.Seq2[In, error]) iter.Seq2[Out, error] {
+	return func(yield func(Out, error) bool) {
+		for v, err := range seq {
+			if err != nil {
+				var zero Out
+				if !yield(zero, err) {
+					return
+				}
+				continue
+			}
+
+			if !yield(f(v)) {
+				return
+			}
+		}
+	}
+}
+
 func TryCollect[K any](it iter.Seq2[K, error]) ([]K, error) {
 	var res []K
 	for k, err := range it {

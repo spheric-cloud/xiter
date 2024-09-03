@@ -5,6 +5,7 @@ package xiter_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -1843,5 +1844,25 @@ func TestMerge(t *testing.T) {
 
 	if !reflect.DeepEqual(res, want) {
 		t.Errorf("Merge() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryMapErr(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+		barErr = errors.New("bar")
+	)
+
+	seq := Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))
+	res := ToKVSlice(TryMapErr(func(i int) (string, error) {
+		if i > 2 {
+			return "", barErr
+		}
+		return strconv.Itoa(i), nil
+	}, seq))
+
+	want := []any{"1", (error)(nil), "", fooErr, "", barErr}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryMapErr() res = %v, want %v", res, want)
 	}
 }
