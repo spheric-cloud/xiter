@@ -1934,3 +1934,109 @@ func TestTryFlatmapErr(t *testing.T) {
 		t.Errorf("TryFlatmapErr() res = %v, want %v", res, want)
 	}
 }
+
+func TestTryTap(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	var res []int
+	Drain2(TryTap(func(i int) { res = append(res, i) }, Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))))
+
+	want := []int{1, 3}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryTap() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryAppend(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	var res []int
+	res, err := TryAppend(res, Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil)))
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryAppend() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryAppend() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryCollectWithCap(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	res, err := TryCollectWithCap(Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil)), 4)
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryCollectWithCap() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryCollectWithCap() res = %v, want %v", res, want)
+	}
+
+	wantCap := 4
+	if cap(res) != wantCap {
+		t.Errorf("TryCollectWithCap() cap = %v, want %v", cap(res), wantCap)
+	}
+}
+
+func TestTryAppendDeref(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	var res []int
+	res, err := TryAppendDeref(res, Merge(Ref(Of(1, 2, 3)), Of[error](nil, fooErr, nil)))
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryAppendDeref() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryAppendDeref() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryCollectDeref(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	res, err := TryCollectDeref(Merge(Ref(Of(1, 2, 3)), Of[error](nil, fooErr, nil)))
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryCollectDeref() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryCollectDeref() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryCollectDerefWithCap(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	res, err := TryCollectDerefWithCap(Merge(Ref(Of(1, 2, 3)), Of[error](nil, fooErr, nil)), 4)
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryCollectDerefWithCap() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryCollectDerefWithCap() res = %v, want %v", res, want)
+	}
+
+	wantCap := 4
+	if cap(res) != wantCap {
+		t.Errorf("TryCollectDerefWithCap() cap = %v, want %v", cap(res), wantCap)
+	}
+}

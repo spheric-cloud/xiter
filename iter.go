@@ -770,6 +770,16 @@ func Flatten2[K, V any](seq iter.Seq[iter.Seq2[K, V]]) iter.Seq2[K, V] {
 	}
 }
 
+// Ref returns a sequence that takes references of the original sequence values.
+func Ref[V any](seq iter.Seq[V]) iter.Seq[*V] {
+	return Map(func(v V) *V { return &v }, seq)
+}
+
+// Deref returns a sequence that dereferences the original sequence values.
+func Deref[V any](seq iter.Seq[*V]) iter.Seq[V] {
+	return Map(func(v *V) V { return *v }, seq)
+}
+
 func Reduce[Sum, V any](sum Sum, f func(Sum, V) Sum, seq iter.Seq[V]) Sum {
 	for v := range seq {
 		sum = f(sum, v)
@@ -940,16 +950,74 @@ func TryFlatmapErr[In, Out any](f func(In) iter.Seq2[Out, error], seq iter.Seq2[
 	}
 }
 
-func TryCollect[K any](it iter.Seq2[K, error]) ([]K, error) {
-	var res []K
+// TryTap calls the given function on each non-error tuple value.
+func TryTap[K any](f func(K), seq iter.Seq2[K, error]) iter.Seq2[K, error] {
+	return func(yield func(K, error) bool) {
+		for v, err := range seq {
+			if err != nil {
+				if !yield(v, err) {
+					return
+				}
+				continue
+			}
+
+			f(v)
+		}
+	}
+}
+
+// TryAppend appends non-error values to the given slice.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryAppend[S ~[]K, K any](s S, it iter.Seq2[K, error]) ([]K, error) {
 	for k, err := range it {
 		if err != nil {
-			return res, err
+			return s, err
 		}
 
-		res = append(res, k)
+		s = append(s, k)
 	}
-	return res, nil
+	return s, nil
+}
+
+// TryCollect collects non-error values in a slice.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryCollect[K any](it iter.Seq2[K, error]) ([]K, error) {
+	var res []K
+	return TryAppend(res, it)
+}
+
+// TryCollectWithCap collects non-error values in a slice with the given capacity.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryCollectWithCap[K any](it iter.Seq2[K, error], cap int) ([]K, error) {
+	res := make([]K, 0, cap)
+	return TryAppend(res, it)
+}
+
+// TryAppendDeref appends dereferenced non-error values to the given slice.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryAppendDeref[S ~[]K, K any](s S, it iter.Seq2[*K, error]) ([]K, error) {
+	for k, err := range it {
+		if err != nil {
+			return s, err
+		}
+
+		s = append(s, *k)
+	}
+	return s, nil
+}
+
+// TryCollectDeref collects dereferenced non-error values in a slice.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryCollectDeref[K any](it iter.Seq2[*K, error]) ([]K, error) {
+	var res []K
+	return TryAppendDeref(res, it)
+}
+
+// TryCollectDerefWithCap collects dereferenced non-error values in a slice with the given capacity.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryCollectDerefWithCap[K any](it iter.Seq2[*K, error], cap int) ([]K, error) {
+	res := make([]K, 0, cap)
+	return TryAppendDeref(res, it)
 }
 
 func Swap[K, V any](seq iter.Seq2[K, V]) iter.Seq2[V, K] {
@@ -1271,6 +1339,17 @@ func OfSlice[S ~[]V, V any](s S) iter.Seq[V] {
 	return slices.Values(s)
 }
 
+// OfSlicePtr iterates over pointers of the slice elements.
+func OfSlicePtr[S ~[]V, V any](s S) iter.Seq[*V] {
+	return func(yield func(*V) bool) {
+		for i := range s {
+			if !yield(&s[i]) {
+				return
+			}
+		}
+	}
+}
+
 func OfKVSlice[K, V any, S ~[]any](s S) iter.Seq2[K, V] {
 	if len(s)%2 != 0 {
 		panic(fmt.Sprintf("OfSlice: unmatched number of elements (%d)", len(s)))
@@ -1288,6 +1367,17 @@ func OfSliceIndex[S ~[]V, V any](s S) iter.Seq2[int, V] {
 	return func(yield func(int, V) bool) {
 		for i, v := range s {
 			if !yield(i, v) {
+				return
+			}
+		}
+	}
+}
+
+// OfSlicePtrIndex iterates over pointers and indices of the slice elements.
+func OfSlicePtrIndex[S ~[]V, V any](s S) iter.Seq2[int, *V] {
+	return func(yield func(int, *V) bool) {
+		for i := range s {
+			if !yield(i, &s[i]) {
 				return
 			}
 		}
