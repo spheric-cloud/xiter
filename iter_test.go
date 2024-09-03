@@ -239,7 +239,7 @@ func FuzzZip(f *testing.F) {
 		for i := 0; i < n; i++ {
 			seq := Zip(OfSlice(v1), OfSlice(v2))
 			if i != n-1 {
-				seq = Take(i, seq)
+				seq = Take(seq, i)
 			}
 
 			ans := ToSlice(seq)
@@ -293,7 +293,7 @@ func FuzzZip2(f *testing.F) {
 		for i := 0; i < n; i++ {
 			seq := Zip2(OfKVSlice[int, int](kvs1), OfKVSlice[int, int](kvs2))
 			if i != n-1 {
-				seq = Take(i, seq)
+				seq = Take(seq, i)
 			}
 
 			ans := ToSlice(seq)
@@ -493,9 +493,9 @@ func FuzzForeach(f *testing.F) {
 		s := MkRandSlice(n)
 
 		var ans []int
-		Foreach(func(i int) {
+		Foreach(OfSlice(s), func(i int) {
 			ans = append(ans, i)
-		}, OfSlice(s))
+		})
 
 		if !slices.Equal(ans, s) {
 			t.Errorf("got %v, expected %v", ans, s)
@@ -514,9 +514,9 @@ func FuzzForeach2(f *testing.F) {
 		s := MkRandKVSlice(n)
 
 		var ans []any
-		Foreach2(func(k, v int) {
+		Foreach2(OfKVSlice[int, int](s), func(k, v int) {
 			ans = append(ans, k, v)
-		}, OfKVSlice[int, int](s))
+		})
 
 		if !slices.Equal(ans, s) {
 			t.Errorf("got %v, expected %v", ans, s)
@@ -526,9 +526,9 @@ func FuzzForeach2(f *testing.F) {
 
 func TestTap(t *testing.T) {
 	var got []int
-	Drain(Tap(func(v int) {
+	Drain(Tap(Take(Of(1, 2, 3), 2), func(v int) {
 		got = append(got, v)
-	}, Take(2, Of(1, 2, 3))))
+	}))
 
 	want := []int{1, 2}
 	if !slices.Equal(got, want) {
@@ -538,9 +538,9 @@ func TestTap(t *testing.T) {
 
 func TestTap2(t *testing.T) {
 	var got []any
-	Drain2(Tap2(func(k, v int) {
+	Drain2(Tap2(Take2(OfKVs[int, int](1, 2, 3, 4, 5, 6), 2), func(k, v int) {
 		got = append(got, k, v)
-	}, Take2(2, OfKVs[int, int](1, 2, 3, 4, 5, 6))))
+	}))
 
 	want := []any{1, 2, 3, 4}
 	if !slices.Equal(got, want) {
@@ -549,7 +549,7 @@ func TestTap2(t *testing.T) {
 }
 
 func TestFilter(t *testing.T) {
-	got := ToSlice(Filter(func(i int) bool { return i%2 == 0 }, Of(1, 2, 3, 4, 5, 6)))
+	got := ToSlice(Filter(Of(1, 2, 3, 4, 5, 6), func(i int) bool { return i%2 == 0 }))
 	want := []int{2, 4, 6}
 
 	if !slices.Equal(got, want) {
@@ -558,9 +558,9 @@ func TestFilter(t *testing.T) {
 }
 
 func TestFilter2(t *testing.T) {
-	got := ToKVSlice(Filter2(func(k string, v int) bool {
+	got := ToKVSlice(Filter2(OfKVs[string, int]("f", 1, "fo", 2, "foo", 3), func(k string, v int) bool {
 		return len(k)%2 == 0 && v%2 == 0
-	}, OfKVs[string, int]("f", 1, "fo", 2, "foo", 3)))
+	}))
 	want := []any{"fo", 2}
 
 	if !slices.Equal(got, want) {
@@ -569,7 +569,7 @@ func TestFilter2(t *testing.T) {
 }
 
 func TestFilterNotEqual(t *testing.T) {
-	got := ToSlice(FilterNotEqual(4, Of(1, 2, 3, 4, 5, 6)))
+	got := ToSlice(FilterNotEqual(Of(1, 2, 3, 4, 5, 6), 4))
 	want := []int{1, 2, 3, 5, 6}
 
 	if !slices.Equal(got, want) {
@@ -578,7 +578,7 @@ func TestFilterNotEqual(t *testing.T) {
 }
 
 func TestFilterNotEqual2(t *testing.T) {
-	got := ToKVSlice(FilterNotEqual2("bar", 2, OfKVs[string, int]("foo", 1, "bar", 2, "baz", 3)))
+	got := ToKVSlice(FilterNotEqual2(OfKVs[string, int]("foo", 1, "bar", 2, "baz", 3), "bar", 2))
 	want := []any{"foo", 1, "baz", 3}
 
 	if !slices.Equal(got, want) {
@@ -600,9 +600,9 @@ func TestFind(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			v, ans := Find(func(v int) bool {
+			v, ans := Find(OfSlice(tc.seq), func(v int) bool {
 				return v == tc.v
-			}, OfSlice(tc.seq))
+			})
 
 			if ans != tc.want {
 				t.Errorf("got %t, expected %t (%v in %v)", ans, tc.want, tc.v, tc.seq)
@@ -628,9 +628,9 @@ func TestFind2(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			k, v, ans := Find2(func(k int, v string) bool {
+			k, v, ans := Find2(OfKVSlice[int, string](tc.seq), func(k int, v string) bool {
 				return k == tc.k && v == tc.v
-			}, OfKVSlice[int, string](tc.seq))
+			})
 
 			if ans != tc.want {
 				t.Errorf("got %t, expected %t (%v in %v)", ans, tc.want, tc.v, tc.seq)
@@ -707,9 +707,9 @@ func TestContainsFunc(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ans := ContainsFunc(func(v int) bool {
+			ans := ContainsFunc(OfSlice(tc.seq), func(v int) bool {
 				return v == tc.v
-			}, OfSlice(tc.seq))
+			})
 
 			if ans != tc.want {
 				t.Errorf("got %t, expected %t (%v in %v)", ans, tc.want, tc.v, tc.seq)
@@ -733,9 +733,9 @@ func TestContainsFunc2(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ans := ContainsFunc2(func(k int, v string) bool {
+			ans := ContainsFunc2(OfKVSlice[int, string](tc.seq), func(k int, v string) bool {
 				return k == tc.k && v == tc.v
-			}, OfKVSlice[int, string](tc.seq))
+			})
 
 			if ans != tc.want {
 				t.Errorf("got %t, expected %t (%v in %v)", ans, tc.want, tc.v, tc.seq)
@@ -760,7 +760,7 @@ func FuzzTake(f *testing.F) {
 		}
 		seq := MkRandSlice(n)
 
-		ans := ToSlice(Take(l, OfSlice(seq)))
+		ans := ToSlice(Take(OfSlice(seq), l))
 		want := seq[:l]
 
 		if !slices.Equal(ans, want) {
@@ -785,7 +785,7 @@ func FuzzTake2(f *testing.F) {
 		}
 		seq := MkRandKVSlice(n)
 
-		ans := ToKVSlice(Take2(l, OfKVSlice[int, int](seq)))
+		ans := ToKVSlice(Take2(OfKVSlice[int, int](seq), l))
 		want := seq[:l*2]
 
 		if !slices.Equal(ans, want) {
@@ -829,7 +829,7 @@ func TestTakeWhile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := TakeWhile(tt.f, tt.seq)
+			result := TakeWhile(tt.seq, tt.f)
 			if ok := Equal[int](result, tt.expected); !ok {
 				t.Errorf("Got different sequence than expected for %s", tt.name)
 			}
@@ -872,7 +872,7 @@ func TestTakeWhile2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := TakeWhile2(tt.f, tt.seq)
+			result := TakeWhile2(tt.seq, tt.f)
 			if ok := Equal2[string, int](result, tt.expected); !ok {
 				t.Errorf("Got different sequence than expected for %s", tt.name)
 			}
@@ -909,7 +909,7 @@ func TestDrop(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ans := ToSlice(Drop(tt.n, OfSlice(tt.seq)))
+			ans := ToSlice(Drop(OfSlice(tt.seq), tt.n))
 			want := tt.wantSeq
 			if !slices.Equal(ans, want) {
 				t.Errorf("got %v, want %v", ans, want)
@@ -947,7 +947,7 @@ func TestDrop2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ans := ToKVSlice[string, int](Drop2[string, int](tt.n, OfKVSlice[string, int](tt.seq)))
+			ans := ToKVSlice[string, int](Drop2[string, int](OfKVSlice[string, int](tt.seq), tt.n))
 			want := tt.wantSeq
 			if !slices.Equal(ans, want) {
 				t.Errorf("got %v, want %v", ans, want)
@@ -984,7 +984,7 @@ func TestDropWhile(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ans := ToSlice(DropWhile(tc.f, OfSlice(tc.seq)))
+			ans := ToSlice(DropWhile(OfSlice(tc.seq), tc.f))
 			want := tc.want
 			if !slices.Equal(ans, want) {
 				t.Errorf("got %v, want %v", ans, want)
@@ -1021,7 +1021,7 @@ func TestDropWhile2(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ans := ToKVSlice(DropWhile2(tc.f, OfKVSlice[string, int](tc.seq)))
+			ans := ToKVSlice(DropWhile2(OfKVSlice[string, int](tc.seq), tc.f))
 			want := tc.want
 			if !slices.Equal(ans, want) {
 				t.Errorf("got %v, want %v", ans, want)
@@ -1064,7 +1064,7 @@ func TestGrouped(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ans := ToSlice(Grouped(tc.n, OfSlice(tc.seq)))
+			ans := ToSlice(Grouped(OfSlice(tc.seq), tc.n))
 			want := tc.want
 			if !reflect.DeepEqual(ans, want) {
 				t.Errorf("got %v, want %v", ans, want)
@@ -1075,7 +1075,7 @@ func TestGrouped(t *testing.T) {
 
 func TestMap(t *testing.T) {
 	seq := []int{1, 2, 3, 4}
-	ans := ToSlice(Map(func(i int) int { return i * i }, OfSlice(seq)))
+	ans := ToSlice(Map(OfSlice(seq), func(i int) int { return i * i }))
 	want := []int{1, 4, 9, 16}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1084,7 +1084,7 @@ func TestMap(t *testing.T) {
 
 func TestMap2(t *testing.T) {
 	seq := []any{"a", 1, "b", 2, "c", 3, "d", 4}
-	ans := ToKVSlice(Map2(func(s string, i int) (string, int) { return s, i * i }, OfKVSlice[string, int](seq)))
+	ans := ToKVSlice(Map2(OfKVSlice[string, int](seq), func(s string, i int) (string, int) { return s, i * i }))
 	want := []any{"a", 1, "b", 4, "c", 9, "d", 16}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1093,9 +1093,9 @@ func TestMap2(t *testing.T) {
 
 func TestFlatmap(t *testing.T) {
 	seq := []int{1, 2, 3, 4}
-	ans := ToSlice(Flatmap(func(i int) iter.Seq[int] {
+	ans := ToSlice(Flatmap(OfSlice(seq), func(i int) iter.Seq[int] {
 		return Of(i, i*i)
-	}, OfSlice(seq)))
+	}))
 	want := []int{1, 1, 2, 4, 3, 9, 4, 16}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1104,9 +1104,9 @@ func TestFlatmap(t *testing.T) {
 
 func TestFlatmap2(t *testing.T) {
 	seq := []any{"a", 1, "b", 2, "c", 3, "d", 4}
-	ans := ToKVSlice(Flatmap2(func(s string, i int) iter.Seq2[string, int] {
+	ans := ToKVSlice(Flatmap2(OfKVSlice[string, int](seq), func(s string, i int) iter.Seq2[string, int] {
 		return OfKVs[string, int](s, i*i)
-	}, OfKVSlice[string, int](seq)))
+	}))
 	want := []any{"a", 1, "b", 4, "c", 9, "d", 16}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1132,7 +1132,7 @@ func TestFlatten2(t *testing.T) {
 }
 
 func TestReduce(t *testing.T) {
-	ans := Reduce(0, func(s, v int) int { return s + v }, Of(1, 2, 3, 4, 5))
+	ans := Reduce(0, Of(1, 2, 3, 4, 5), func(s, v int) int { return s + v })
 	want := 15
 	if ans != want {
 		t.Errorf("got %d, expected %d", ans, want)
@@ -1140,7 +1140,7 @@ func TestReduce(t *testing.T) {
 }
 
 func TestReduce2(t *testing.T) {
-	ans := Reduce2(0, func(s, k, v int) int { return s + k + v }, OfKVs[int, int](1, 2, 3, 4, 5, 6))
+	ans := Reduce2(0, OfKVs[int, int](1, 2, 3, 4, 5, 6), func(s, k, v int) int { return s + k + v })
 	want := 21
 	if ans != want {
 		t.Errorf("got %d, expected %d", ans, want)
@@ -1164,9 +1164,9 @@ func TestValues(t *testing.T) {
 }
 
 func TestMapLift(t *testing.T) {
-	ans := ToKVSlice(MapLift(func(i int) (string, int) {
+	ans := ToKVSlice(MapLift(Of(1, 2, 3), func(i int) (string, int) {
 		return strconv.Itoa(i), i
-	}, Of(1, 2, 3)))
+	}))
 	want := []any{"1", 1, "2", 2, "3", 3}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1174,9 +1174,9 @@ func TestMapLift(t *testing.T) {
 }
 
 func TestMapLower(t *testing.T) {
-	ans := ToSlice(MapLower(func(s string, i int) int {
+	ans := ToSlice(MapLower(OfKVs[string, int]("a", 1, "bb", 2, "ccc", 3), func(s string, i int) int {
 		return len(s) + i
-	}, OfKVs[string, int]("a", 1, "bb", 2, "ccc", 3)))
+	}))
 	want := []int{2, 4, 6}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1184,7 +1184,7 @@ func TestMapLower(t *testing.T) {
 }
 
 func TestMapErr(t *testing.T) {
-	ans := ToKVSlice(MapErr(strconv.Atoi, Of("1", "2", "3")))
+	ans := ToKVSlice(MapErr(Of("1", "2", "3"), strconv.Atoi))
 	want := []any{1, (error)(nil), 2, (error)(nil), 3, (error)(nil)}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1200,7 +1200,7 @@ func TestSwap(t *testing.T) {
 }
 
 func TestMapKeys(t *testing.T) {
-	ans := ToKVSlice(MapKeys(func(s string) string { return s + s }, OfKVs[string, int]("a", 1, "b", 2, "c", 3)))
+	ans := ToKVSlice(MapKeys(OfKVs[string, int]("a", 1, "b", 2, "c", 3), func(s string) string { return s + s }))
 	want := []any{"aa", 1, "bb", 2, "cc", 3}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1208,7 +1208,7 @@ func TestMapKeys(t *testing.T) {
 }
 
 func TestMapValues(t *testing.T) {
-	ans := ToKVSlice(MapValues(func(i int) int { return i + i }, OfKVs[string, int]("a", 1, "b", 2, "c", 3)))
+	ans := ToKVSlice(MapValues(OfKVs[string, int]("a", 1, "b", 2, "c", 3), func(i int) int { return i + i }))
 	want := []any{"a", 2, "b", 4, "c", 6}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1252,7 +1252,7 @@ func TestCycle(t *testing.T) {
 	c, stop := Cycle(Of(1, 2))
 	defer stop()
 
-	ans := ToSlice(Take(5, c))
+	ans := ToSlice(Take(c, 5))
 	want := []int{1, 2, 1, 2, 1}
 	if !slices.Equal(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
@@ -1263,7 +1263,7 @@ func TestCycle2(t *testing.T) {
 	c, stop := Cycle2(OfKVs[string, int]("a", 1, "b", 2))
 	defer stop()
 
-	ans := ToKVSlice(Take2(5, c))
+	ans := ToKVSlice(Take2(c, 5))
 	want := []any{"a", 1, "b", 2, "a", 1, "b", 2, "a", 1}
 
 	if !slices.Equal(ans, want) {
@@ -1307,7 +1307,7 @@ func TestAll(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ans := All(tc.f, OfSlice(tc.seq))
+			ans := All(OfSlice(tc.seq), tc.f)
 			want := tc.want
 			if ans != want {
 				t.Errorf("got %t, expected %t", ans, want)
@@ -1344,7 +1344,7 @@ func TestAll2(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ans := All2(tc.f, OfKVSlice[string, int](tc.seq))
+			ans := All2(OfKVSlice[string, int](tc.seq), tc.f)
 			want := tc.want
 			if ans != want {
 				t.Errorf("got %t, expected %t", ans, want)
@@ -1381,7 +1381,7 @@ func TestAny(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ans := Any(tc.f, OfSlice(tc.seq))
+			ans := Any(OfSlice(tc.seq), tc.f)
 			want := tc.want
 			if ans != want {
 				t.Errorf("got %t, expected %t", ans, want)
@@ -1418,7 +1418,7 @@ func TestAny2(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ans := Any2(tc.f, OfKVSlice[string, int](tc.seq))
+			ans := Any2(OfKVSlice[string, int](tc.seq), tc.f)
 			want := tc.want
 			if ans != want {
 				t.Errorf("got %t, expected %t", ans, want)
@@ -1428,7 +1428,7 @@ func TestAny2(t *testing.T) {
 }
 
 func TestCount(t *testing.T) {
-	ans := Count(func(i int) bool { return i%2 == 0 }, Of(1, 2, 3, 4, 5))
+	ans := Count(Of(1, 2, 3, 4, 5), func(i int) bool { return i%2 == 0 })
 	want := 2
 	if ans != want {
 		t.Errorf("got %d, want %d", ans, want)
@@ -1436,7 +1436,7 @@ func TestCount(t *testing.T) {
 }
 
 func TestCount2(t *testing.T) {
-	ans := Count2(func(s string, i int) bool { return i%2 == 0 }, OfKVs[string, int]("a", 1, "b", 2, "c", 3, "d", 4, "e", 5))
+	ans := Count2(OfKVs[string, int]("a", 1, "b", 2, "c", 3, "d", 4, "e", 5), func(s string, i int) bool { return i%2 == 0 })
 	want := 2
 	if ans != want {
 		t.Errorf("got %d, want %d", ans, want)
@@ -1502,7 +1502,7 @@ func TestIndex(t *testing.T) {
 				}
 			}()
 
-			ans := Index(tc.idx, OfSlice(tc.seq))
+			ans := Index(OfSlice(tc.seq), tc.idx)
 			if ans != tc.want {
 				t.Errorf("got %d, expected %d", ans, tc.want)
 			}
@@ -1536,7 +1536,7 @@ func TestIndex2(t *testing.T) {
 				}
 			}()
 
-			kAns, vAns := Index2(tc.idx, OfKVSlice[int, int](tc.seq))
+			kAns, vAns := Index2(OfKVSlice[int, int](tc.seq), tc.idx)
 			if kAns != tc.wantK {
 				t.Errorf("got %d, expected %d", kAns, tc.wantK)
 			}
@@ -1824,7 +1824,7 @@ func TestSeparatePartial(t *testing.T) {
 	kSeq, vSeq, stop := Separate(OfKVs[string, int]("foo", 1, "bar", 2))
 	defer stop()
 
-	k := ToSlice(Take(1, kSeq))
+	k := ToSlice(Take(kSeq, 1))
 	vs := ToSlice(vSeq)
 
 	wantK := []string{"foo"}
@@ -1854,12 +1854,12 @@ func TestTryMapErr(t *testing.T) {
 	)
 
 	seq := Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))
-	res := ToKVSlice(TryMapErr(func(i int) (string, error) {
+	res := ToKVSlice(TryMapErr(seq, func(i int) (string, error) {
 		if i > 2 {
 			return "", barErr
 		}
 		return strconv.Itoa(i), nil
-	}, seq))
+	}))
 
 	want := []any{"1", (error)(nil), "", fooErr, "", barErr}
 	if !reflect.DeepEqual(res, want) {
@@ -1873,9 +1873,9 @@ func TestTryFilter(t *testing.T) {
 	)
 
 	seq := Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))
-	res := ToKVSlice(TryFilter(func(i int) bool {
+	res := ToKVSlice(TryFilter(seq, func(i int) bool {
 		return i <= 2
-	}, seq))
+	}))
 
 	want := []any{1, (error)(nil), 2, fooErr}
 	if !reflect.DeepEqual(res, want) {
@@ -1889,9 +1889,9 @@ func TestTryMap(t *testing.T) {
 	)
 
 	seq := Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))
-	res := ToKVSlice(TryMap(func(i int) string {
+	res := ToKVSlice(TryMap(seq, func(i int) string {
 		return strconv.Itoa(i)
-	}, seq))
+	}))
 
 	want := []any{"1", (error)(nil), "", fooErr, "3", nil}
 	if !reflect.DeepEqual(res, want) {
@@ -1905,9 +1905,9 @@ func TestTryFlatmap(t *testing.T) {
 	)
 
 	seq := Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))
-	res := ToKVSlice(TryFlatmap(func(i int) iter.Seq[string] {
+	res := ToKVSlice(TryFlatmap(seq, func(i int) iter.Seq[string] {
 		return Of(strconv.Itoa(i))
-	}, seq))
+	}))
 
 	want := []any{"1", (error)(nil), "", fooErr, "3", nil}
 	if !reflect.DeepEqual(res, want) {
@@ -1922,12 +1922,12 @@ func TestTryFlatmapErr(t *testing.T) {
 	)
 
 	seq := Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))
-	res := ToKVSlice(TryFlatmapErr(func(i int) iter.Seq2[string, error] {
+	res := ToKVSlice(TryFlatmapErr(seq, func(i int) iter.Seq2[string, error] {
 		if i > 2 {
 			return OfKVs[string, error]("", barErr)
 		}
 		return Merge(Of(strconv.Itoa(i)), Of((error)(nil)))
-	}, seq))
+	}))
 
 	want := []any{"1", (error)(nil), "", fooErr, "", barErr}
 	if !reflect.DeepEqual(res, want) {
@@ -1941,7 +1941,7 @@ func TestTryTap(t *testing.T) {
 	)
 
 	var res []int
-	Drain2(TryTap(func(i int) { res = append(res, i) }, Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil))))
+	Drain2(TryTap(Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil)), func(i int) { res = append(res, i) }))
 
 	want := []int{1, 3}
 	if !reflect.DeepEqual(res, want) {

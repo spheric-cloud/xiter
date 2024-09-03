@@ -363,19 +363,19 @@ func EqualFunc2[K1, V1, K2, V2 any](seq1 iter.Seq2[K1, V1], seq2 iter.Seq2[K2, V
 	return true
 }
 
-func Foreach[V any](f func(V), seq iter.Seq[V]) {
+func Foreach[V any](seq iter.Seq[V], f func(V)) {
 	for v := range seq {
 		f(v)
 	}
 }
 
-func Foreach2[K, V any](f func(K, V), seq iter.Seq2[K, V]) {
+func Foreach2[K, V any](seq iter.Seq2[K, V], f func(K, V)) {
 	for k, v := range seq {
 		f(k, v)
 	}
 }
 
-func Tap[V any](f func(V), seq iter.Seq[V]) iter.Seq[V] {
+func Tap[V any](seq iter.Seq[V], f func(V)) iter.Seq[V] {
 	return func(yield func(V) bool) {
 		for v := range seq {
 			f(v)
@@ -386,7 +386,7 @@ func Tap[V any](f func(V), seq iter.Seq[V]) iter.Seq[V] {
 	}
 }
 
-func Tap2[K, V any](f func(K, V), seq iter.Seq2[K, V]) iter.Seq2[K, V] {
+func Tap2[K, V any](seq iter.Seq2[K, V], f func(K, V)) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		for k, v := range seq {
 			f(k, v)
@@ -397,15 +397,15 @@ func Tap2[K, V any](f func(K, V), seq iter.Seq2[K, V]) iter.Seq2[K, V] {
 	}
 }
 
-func TapKey[K, V any](f func(K), seq iter.Seq2[K, V]) iter.Seq2[K, V] {
-	return Tap2(func(k K, v V) { f(k) }, seq)
+func TapKey[K, V any](seq iter.Seq2[K, V], f func(K)) iter.Seq2[K, V] {
+	return Tap2(seq, func(k K, v V) { f(k) })
 }
 
-func TapValue[K, V any](f func(V), seq iter.Seq2[K, V]) iter.Seq2[K, V] {
-	return Tap2(func(k K, v V) { f(v) }, seq)
+func TapValue[K, V any](seq iter.Seq2[K, V], f func(V)) iter.Seq2[K, V] {
+	return Tap2(seq, func(k K, v V) { f(v) })
 }
 
-func Filter[V any](f func(V) bool, seq iter.Seq[V]) iter.Seq[V] {
+func Filter[V any](seq iter.Seq[V], f func(V) bool) iter.Seq[V] {
 	return func(yield func(V) bool) {
 		for v := range seq {
 			if f(v) {
@@ -417,7 +417,7 @@ func Filter[V any](f func(V) bool, seq iter.Seq[V]) iter.Seq[V] {
 	}
 }
 
-func Filter2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
+func Filter2[K, V any](seq iter.Seq2[K, V], f func(K, V) bool) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		for k, v := range seq {
 			if f(k, v) {
@@ -429,39 +429,39 @@ func Filter2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
 	}
 }
 
-func FilterKey[K, V any](f func(K) bool, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
-	return Filter2(func(k K, _ V) bool { return f(k) }, seq)
+func FilterKey[K, V any](seq iter.Seq2[K, V], f func(K) bool) iter.Seq2[K, V] {
+	return Filter2(seq, func(k K, _ V) bool { return f(k) })
 }
 
-func FilterValue[K, V any](f func(V) bool, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
-	return Filter2(func(_ K, v V) bool { return f(v) }, seq)
+func FilterValue[K, V any](seq iter.Seq2[K, V], f func(V) bool) iter.Seq2[K, V] {
+	return Filter2(seq, func(_ K, v V) bool { return f(v) })
 }
 
-func FilterNotEqual[V comparable](notEq V, seq iter.Seq[V]) iter.Seq[V] {
-	return Filter(func(v V) bool {
+func FilterNotEqual[V comparable](seq iter.Seq[V], notEq V) iter.Seq[V] {
+	return Filter(seq, func(v V) bool {
 		return v != notEq
-	}, seq)
+	})
 }
 
-func FilterNotEqual2[K, V comparable](kNotEq K, vNotEq V, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
-	return Filter2(func(k K, v V) bool {
+func FilterNotEqual2[K, V comparable](seq iter.Seq2[K, V], kNotEq K, vNotEq V) iter.Seq2[K, V] {
+	return Filter2(seq, func(k K, v V) bool {
 		return kNotEq != k && vNotEq != v
-	}, seq)
+	})
 }
 
-func FilterKeyNotEqual[K comparable, V any](kNotEq K, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
-	return Filter2(func(k K, v V) bool {
+func FilterKeyNotEqual[K comparable, V any](seq iter.Seq2[K, V], kNotEq K) iter.Seq2[K, V] {
+	return Filter2(seq, func(k K, v V) bool {
 		return kNotEq != k
-	}, seq)
+	})
 }
 
-func FilterValueNotEqual[K any, V comparable](vNotEq V, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
-	return Filter2(func(k K, v V) bool {
+func FilterValueNotEqual[K any, V comparable](seq iter.Seq2[K, V], vNotEq V) iter.Seq2[K, V] {
+	return Filter2(seq, func(k K, v V) bool {
 		return vNotEq != v
-	}, seq)
+	})
 }
 
-func Find[V any](f func(V) bool, seq iter.Seq[V]) (V, bool) {
+func Find[V any](seq iter.Seq[V], f func(V) bool) (V, bool) {
 	for v := range seq {
 		if f(v) {
 			return v, true
@@ -471,7 +471,7 @@ func Find[V any](f func(V) bool, seq iter.Seq[V]) (V, bool) {
 	return zero, false
 }
 
-func Find2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) (K, V, bool) {
+func Find2[K, V any](seq iter.Seq2[K, V], f func(K, V) bool) (K, V, bool) {
 	for k, v := range seq {
 		if f(k, v) {
 			return k, v, true
@@ -484,12 +484,12 @@ func Find2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) (K, V, bool) {
 	return zeroK, zeroV, false
 }
 
-func FindByKey[K, V any](f func(K) bool, seq iter.Seq2[K, V]) (K, V, bool) {
-	return Find2(func(k K, v V) bool { return f(k) }, seq)
+func FindByKey[K, V any](seq iter.Seq2[K, V], f func(K) bool) (K, V, bool) {
+	return Find2(seq, func(k K, v V) bool { return f(k) })
 }
 
-func FindByValue[K, V any](f func(V) bool, seq iter.Seq2[K, V]) (K, V, bool) {
-	return Find2(func(k K, v V) bool { return f(v) }, seq)
+func FindByValue[K, V any](seq iter.Seq2[K, V], f func(V) bool) (K, V, bool) {
+	return Find2(seq, func(k K, v V) bool { return f(v) })
 }
 
 func Contains[V comparable](seq iter.Seq[V], needle V) bool {
@@ -510,7 +510,7 @@ func Contains2[K, V comparable](seq iter.Seq2[K, V], needleK K, needleV V) bool 
 	return false
 }
 
-func ContainsFunc[V any](f func(V) bool, seq iter.Seq[V]) bool {
+func ContainsFunc[V any](seq iter.Seq[V], f func(V) bool) bool {
 	for v := range seq {
 		if f(v) {
 			return true
@@ -519,7 +519,7 @@ func ContainsFunc[V any](f func(V) bool, seq iter.Seq[V]) bool {
 	return false
 }
 
-func ContainsFunc2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) bool {
+func ContainsFunc2[K, V any](seq iter.Seq2[K, V], f func(K, V) bool) bool {
 	for k, v := range seq {
 		if f(k, v) {
 			return true
@@ -528,7 +528,7 @@ func ContainsFunc2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) bool {
 	return false
 }
 
-func Take[V any](n int, seq iter.Seq[V]) iter.Seq[V] {
+func Take[V any](seq iter.Seq[V], n int) iter.Seq[V] {
 	return func(yield func(V) bool) {
 		var i int
 		for v := range seq {
@@ -544,7 +544,7 @@ func Take[V any](n int, seq iter.Seq[V]) iter.Seq[V] {
 	}
 }
 
-func Take2[K, V any](n int, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
+func Take2[K, V any](seq iter.Seq2[K, V], n int) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		var i int
 		for k, v := range seq {
@@ -560,7 +560,7 @@ func Take2[K, V any](n int, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
 	}
 }
 
-func TakeWhile[V any](f func(V) bool, seq iter.Seq[V]) iter.Seq[V] {
+func TakeWhile[V any](seq iter.Seq[V], f func(V) bool) iter.Seq[V] {
 	return func(yield func(V) bool) {
 		for v := range seq {
 			if !f(v) {
@@ -574,7 +574,7 @@ func TakeWhile[V any](f func(V) bool, seq iter.Seq[V]) iter.Seq[V] {
 	}
 }
 
-func TakeWhile2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
+func TakeWhile2[K, V any](seq iter.Seq2[K, V], f func(K, V) bool) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		for k, v := range seq {
 			if !f(k, v) {
@@ -588,7 +588,7 @@ func TakeWhile2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) iter.Seq2[K, V
 	}
 }
 
-func Drop[V any](n int, seq iter.Seq[V]) iter.Seq[V] {
+func Drop[V any](seq iter.Seq[V], n int) iter.Seq[V] {
 	return func(yield func(V) bool) {
 		var i int
 		for v := range seq {
@@ -604,7 +604,7 @@ func Drop[V any](n int, seq iter.Seq[V]) iter.Seq[V] {
 	}
 }
 
-func Drop2[K, V any](n int, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
+func Drop2[K, V any](seq iter.Seq2[K, V], n int) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		var i int
 		for k, v := range seq {
@@ -620,7 +620,7 @@ func Drop2[K, V any](n int, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
 	}
 }
 
-func DropWhile[V any](f func(V) bool, seq iter.Seq[V]) iter.Seq[V] {
+func DropWhile[V any](seq iter.Seq[V], f func(V) bool) iter.Seq[V] {
 	return func(yield func(V) bool) {
 		drop := true
 		for v := range seq {
@@ -638,7 +638,7 @@ func DropWhile[V any](f func(V) bool, seq iter.Seq[V]) iter.Seq[V] {
 	}
 }
 
-func DropWhile2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) iter.Seq2[K, V] {
+func DropWhile2[K, V any](seq iter.Seq2[K, V], f func(K, V) bool) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		drop := true
 		for k, v := range seq {
@@ -656,7 +656,7 @@ func DropWhile2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) iter.Seq2[K, V
 	}
 }
 
-func GroupedNoCopy[V any](n int, seq iter.Seq[V]) iter.Seq[[]V] {
+func GroupedNoCopy[V any](seq iter.Seq[V], n int) iter.Seq[[]V] {
 	if n <= 0 {
 		panic("GroupedNoCopy: n must be greater than 0")
 	}
@@ -679,7 +679,7 @@ func GroupedNoCopy[V any](n int, seq iter.Seq[V]) iter.Seq[[]V] {
 	}
 }
 
-func Grouped[V any](n int, seq iter.Seq[V]) iter.Seq[[]V] {
+func Grouped[V any](seq iter.Seq[V], n int) iter.Seq[[]V] {
 	if n <= 0 {
 		panic("Grouped: n must be greater than 0")
 	}
@@ -702,7 +702,7 @@ func Grouped[V any](n int, seq iter.Seq[V]) iter.Seq[[]V] {
 	}
 }
 
-func Map[In, Out any](f func(In) Out, seq iter.Seq[In]) iter.Seq[Out] {
+func Map[In, Out any](seq iter.Seq[In], f func(In) Out) iter.Seq[Out] {
 	return func(yield func(Out) bool) {
 		for v := range seq {
 			if !yield(f(v)) {
@@ -712,7 +712,7 @@ func Map[In, Out any](f func(In) Out, seq iter.Seq[In]) iter.Seq[Out] {
 	}
 }
 
-func Map2[KIn, VIn, KOut, VOut any](f func(KIn, VIn) (KOut, VOut), seq iter.Seq2[KIn, VIn]) iter.Seq2[KOut, VOut] {
+func Map2[KIn, VIn, KOut, VOut any](seq iter.Seq2[KIn, VIn], f func(KIn, VIn) (KOut, VOut)) iter.Seq2[KOut, VOut] {
 	return func(yield func(KOut, VOut) bool) {
 		for k, v := range seq {
 			if !yield(f(k, v)) {
@@ -722,7 +722,7 @@ func Map2[KIn, VIn, KOut, VOut any](f func(KIn, VIn) (KOut, VOut), seq iter.Seq2
 	}
 }
 
-func Flatmap[In, Out any](f func(In) iter.Seq[Out], seq iter.Seq[In]) iter.Seq[Out] {
+func Flatmap[In, Out any](seq iter.Seq[In], f func(In) iter.Seq[Out]) iter.Seq[Out] {
 	return func(yield func(Out) bool) {
 		for v := range seq {
 			for vi := range f(v) {
@@ -734,7 +734,7 @@ func Flatmap[In, Out any](f func(In) iter.Seq[Out], seq iter.Seq[In]) iter.Seq[O
 	}
 }
 
-func Flatmap2[KIn, VIn, KOut, VOut any](f func(KIn, VIn) iter.Seq2[KOut, VOut], seq iter.Seq2[KIn, VIn]) iter.Seq2[KOut, VOut] {
+func Flatmap2[KIn, VIn, KOut, VOut any](seq iter.Seq2[KIn, VIn], f func(KIn, VIn) iter.Seq2[KOut, VOut]) iter.Seq2[KOut, VOut] {
 	return func(yield func(KOut, VOut) bool) {
 		for k, v := range seq {
 			for ki, vi := range f(k, v) {
@@ -772,22 +772,22 @@ func Flatten2[K, V any](seq iter.Seq[iter.Seq2[K, V]]) iter.Seq2[K, V] {
 
 // Ref returns a sequence that takes references of the original sequence values.
 func Ref[V any](seq iter.Seq[V]) iter.Seq[*V] {
-	return Map(func(v V) *V { return &v }, seq)
+	return Map(seq, func(v V) *V { return &v })
 }
 
 // Deref returns a sequence that dereferences the original sequence values.
 func Deref[V any](seq iter.Seq[*V]) iter.Seq[V] {
-	return Map(func(v *V) V { return *v }, seq)
+	return Map(seq, func(v *V) V { return *v })
 }
 
-func Reduce[Sum, V any](sum Sum, f func(Sum, V) Sum, seq iter.Seq[V]) Sum {
+func Reduce[Sum, V any](sum Sum, seq iter.Seq[V], f func(Sum, V) Sum) Sum {
 	for v := range seq {
 		sum = f(sum, v)
 	}
 	return sum
 }
 
-func Reduce2[Sum, K, V any](sum Sum, f func(Sum, K, V) Sum, seq iter.Seq2[K, V]) Sum {
+func Reduce2[Sum, K, V any](sum Sum, seq iter.Seq2[K, V], f func(Sum, K, V) Sum) Sum {
 	for k, v := range seq {
 		sum = f(sum, k, v)
 	}
@@ -814,7 +814,7 @@ func Values[K, V any](seq iter.Seq2[K, V]) iter.Seq[V] {
 	}
 }
 
-func MapLift[In, KOut, VOut any](f func(In) (KOut, VOut), seq iter.Seq[In]) iter.Seq2[KOut, VOut] {
+func MapLift[In, KOut, VOut any](seq iter.Seq[In], f func(In) (KOut, VOut)) iter.Seq2[KOut, VOut] {
 	return func(yield func(KOut, VOut) bool) {
 		for v := range seq {
 			if !yield(f(v)) {
@@ -824,7 +824,7 @@ func MapLift[In, KOut, VOut any](f func(In) (KOut, VOut), seq iter.Seq[In]) iter
 	}
 }
 
-func MapLower[KIn, VIn, VOut any](f func(KIn, VIn) VOut, seq iter.Seq2[KIn, VIn]) iter.Seq[VOut] {
+func MapLower[KIn, VIn, VOut any](seq iter.Seq2[KIn, VIn], f func(KIn, VIn) VOut) iter.Seq[VOut] {
 	return func(yield func(VOut) bool) {
 		for k, v := range seq {
 			if !yield(f(k, v)) {
@@ -834,13 +834,13 @@ func MapLower[KIn, VIn, VOut any](f func(KIn, VIn) VOut, seq iter.Seq2[KIn, VIn]
 	}
 }
 
-func MapErr[In, Out any](f func(In) (Out, error), seq iter.Seq[In]) iter.Seq2[Out, error] {
-	return MapLift[In, Out, error](f, seq)
+func MapErr[In, Out any](seq iter.Seq[In], f func(In) (Out, error)) iter.Seq2[Out, error] {
+	return MapLift[In, Out, error](seq, f)
 }
 
 // TryMapErr applies the transformation function f to each non-error tuple of the given sequence.
 // For error-tuples, the function is not applied and yield is called with the error and the zero value of Out.
-func TryMapErr[In, Out any](f func(In) (Out, error), seq iter.Seq2[In, error]) iter.Seq2[Out, error] {
+func TryMapErr[In, Out any](seq iter.Seq2[In, error], f func(In) (Out, error)) iter.Seq2[Out, error] {
 	return func(yield func(Out, error) bool) {
 		for v, err := range seq {
 			if err != nil {
@@ -860,7 +860,7 @@ func TryMapErr[In, Out any](f func(In) (Out, error), seq iter.Seq2[In, error]) i
 
 // TryFilter filters non-error tuples with the given predicate function.
 // For error-tuples, the filter is not applied and yield is called with the error and the value.
-func TryFilter[K any](f func(K) bool, seq iter.Seq2[K, error]) iter.Seq2[K, error] {
+func TryFilter[K any](seq iter.Seq2[K, error], f func(K) bool) iter.Seq2[K, error] {
 	return func(yield func(K, error) bool) {
 		for v, err := range seq {
 			if err != nil {
@@ -884,7 +884,7 @@ func TryFilter[K any](f func(K) bool, seq iter.Seq2[K, error]) iter.Seq2[K, erro
 
 // TryMap maps non-error tuples with the given function.
 // For error-tuples, the function is not applied and yield is called with the error and the zero Out value.
-func TryMap[In, Out any](f func(In) Out, seq iter.Seq2[In, error]) iter.Seq2[Out, error] {
+func TryMap[In, Out any](seq iter.Seq2[In, error], f func(In) Out) iter.Seq2[Out, error] {
 	return func(yield func(Out, error) bool) {
 		for v, err := range seq {
 			if err != nil {
@@ -906,7 +906,7 @@ func TryMap[In, Out any](f func(In) Out, seq iter.Seq2[In, error]) iter.Seq2[Out
 
 // TryFlatmap maps non-error tuples with the given function, flattening the result.
 // For error-tuples, the function is not applied and yield is called with the error and the zero Out value.
-func TryFlatmap[In, Out any](f func(In) iter.Seq[Out], seq iter.Seq2[In, error]) iter.Seq2[Out, error] {
+func TryFlatmap[In, Out any](seq iter.Seq2[In, error], f func(In) iter.Seq[Out]) iter.Seq2[Out, error] {
 	return func(yield func(Out, error) bool) {
 		for v, err := range seq {
 			if err != nil {
@@ -929,7 +929,7 @@ func TryFlatmap[In, Out any](f func(In) iter.Seq[Out], seq iter.Seq2[In, error])
 
 // TryFlatmapErr maps non-error tuples with the given function, flattening the result.
 // For error-tuples, the function is not applied and yield is called with the error and the zero Out value.
-func TryFlatmapErr[In, Out any](f func(In) iter.Seq2[Out, error], seq iter.Seq2[In, error]) iter.Seq2[Out, error] {
+func TryFlatmapErr[In, Out any](seq iter.Seq2[In, error], f func(In) iter.Seq2[Out, error]) iter.Seq2[Out, error] {
 	return func(yield func(Out, error) bool) {
 		for v, err := range seq {
 			if err != nil {
@@ -951,7 +951,7 @@ func TryFlatmapErr[In, Out any](f func(In) iter.Seq2[Out, error], seq iter.Seq2[
 }
 
 // TryTap calls the given function on each non-error tuple value.
-func TryTap[K any](f func(K), seq iter.Seq2[K, error]) iter.Seq2[K, error] {
+func TryTap[K any](seq iter.Seq2[K, error], f func(K)) iter.Seq2[K, error] {
 	return func(yield func(K, error) bool) {
 		for v, err := range seq {
 			if err != nil {
@@ -1030,16 +1030,16 @@ func Swap[K, V any](seq iter.Seq2[K, V]) iter.Seq2[V, K] {
 	}
 }
 
-func MapKeys[KIn, V, KOut any](f func(KIn) KOut, seq iter.Seq2[KIn, V]) iter.Seq2[KOut, V] {
-	return Map2(func(k KIn, v V) (KOut, V) {
+func MapKeys[KIn, V, KOut any](seq iter.Seq2[KIn, V], f func(KIn) KOut) iter.Seq2[KOut, V] {
+	return Map2(seq, func(k KIn, v V) (KOut, V) {
 		return f(k), v
-	}, seq)
+	})
 }
 
-func MapValues[K, VIn, VOut any](f func(VIn) VOut, seq iter.Seq2[K, VIn]) iter.Seq2[K, VOut] {
-	return Map2(func(k K, v VIn) (K, VOut) {
+func MapValues[K, VIn, VOut any](seq iter.Seq2[K, VIn], f func(VIn) VOut) iter.Seq2[K, VOut] {
+	return Map2(seq, func(k K, v VIn) (K, VOut) {
 		return k, f(v)
-	}, seq)
+	})
 }
 
 func Repeat[V any](v V, n int) iter.Seq[V] {
@@ -1193,7 +1193,7 @@ func Enumerate[V any](seq iter.Seq[V]) iter.Seq2[int, V] {
 	}
 }
 
-func All[V any](f func(V) bool, seq iter.Seq[V]) bool {
+func All[V any](seq iter.Seq[V], f func(V) bool) bool {
 	for v := range seq {
 		if !f(v) {
 			return false
@@ -1202,7 +1202,7 @@ func All[V any](f func(V) bool, seq iter.Seq[V]) bool {
 	return true
 }
 
-func All2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) bool {
+func All2[K, V any](seq iter.Seq2[K, V], f func(K, V) bool) bool {
 	for k, v := range seq {
 		if !f(k, v) {
 			return false
@@ -1211,7 +1211,7 @@ func All2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) bool {
 	return true
 }
 
-func Any[V any](f func(V) bool, seq iter.Seq[V]) bool {
+func Any[V any](seq iter.Seq[V], f func(V) bool) bool {
 	for v := range seq {
 		if f(v) {
 			return true
@@ -1220,7 +1220,7 @@ func Any[V any](f func(V) bool, seq iter.Seq[V]) bool {
 	return false
 }
 
-func Any2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) bool {
+func Any2[K, V any](seq iter.Seq2[K, V], f func(K, V) bool) bool {
 	for k, v := range seq {
 		if f(k, v) {
 			return true
@@ -1229,7 +1229,7 @@ func Any2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) bool {
 	return false
 }
 
-func Count[V any](f func(V) bool, seq iter.Seq[V]) int {
+func Count[V any](seq iter.Seq[V], f func(V) bool) int {
 	var n int
 	for v := range seq {
 		if f(v) {
@@ -1239,7 +1239,7 @@ func Count[V any](f func(V) bool, seq iter.Seq[V]) int {
 	return n
 }
 
-func Count2[K, V any](f func(K, V) bool, seq iter.Seq2[K, V]) int {
+func Count2[K, V any](seq iter.Seq2[K, V], f func(K, V) bool) int {
 	var n int
 	for k, v := range seq {
 		if f(k, v) {
@@ -1267,7 +1267,7 @@ func Len2[K, V any](s iter.Seq2[K, V]) int {
 	return n
 }
 
-func Index[V any](idx int, seq iter.Seq[V]) V {
+func Index[V any](seq iter.Seq[V], idx int) V {
 	if idx < 0 {
 		panic("Index: negative index")
 	}
@@ -1282,7 +1282,7 @@ func Index[V any](idx int, seq iter.Seq[V]) V {
 	panic(fmt.Sprintf("Index: index %d out of bounds", idx))
 }
 
-func Index2[K, V any](idx int, seq iter.Seq2[K, V]) (K, V) {
+func Index2[K, V any](seq iter.Seq2[K, V], idx int) (K, V) {
 	if idx < 0 {
 		panic("Index2: negative index")
 	}
@@ -1585,9 +1585,9 @@ func ToList[V any](seq iter.Seq[V]) *list.List {
 
 func Sum[V cmp.Ordered](seq iter.Seq[V]) V {
 	var zero V
-	return Reduce(zero, func(sum V, v V) V {
+	return Reduce(zero, seq, func(sum V, v V) V {
 		return sum + v
-	}, seq)
+	})
 }
 
 func Max[V cmp.Ordered](seq iter.Seq[V]) V {
