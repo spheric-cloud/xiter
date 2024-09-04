@@ -2040,3 +2040,39 @@ func TestTryCollectDerefWithCap(t *testing.T) {
 		t.Errorf("TryCollectDerefWithCap() cap = %v, want %v", cap(res), wantCap)
 	}
 }
+
+func TestFilterErr(t *testing.T) {
+	var (
+		tooLargeErr = errors.New("too large")
+	)
+	res := ToKVSlice(FilterErr(Of(1, 2, 3, 4), func(i int) (bool, error) {
+		if i >= 3 {
+			return false, tooLargeErr
+		}
+		return i%2 == 0, nil
+	}))
+	want := []any{2, (error)(nil), 3, tooLargeErr, 4, tooLargeErr}
+
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("FilterErr() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryFilterErr(t *testing.T) {
+	var (
+		tooLargeErr = errors.New("too large")
+		fooErr      = errors.New("foo")
+	)
+
+	res := ToKVSlice(TryFilterErr(Merge(Of(1, 2, 3, 4), Of[error](nil, nil, fooErr, nil)), func(i int) (bool, error) {
+		if i >= 3 {
+			return false, tooLargeErr
+		}
+		return i%2 == 0, nil
+	}))
+	want := []any{2, (error)(nil), 3, fooErr, 4, tooLargeErr}
+
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryFilterErr() res = %v, want %v", res, want)
+	}
+}

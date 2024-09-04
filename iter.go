@@ -417,6 +417,29 @@ func Filter[V any](seq iter.Seq[V], f func(V) bool) iter.Seq[V] {
 	}
 }
 
+// FilterErr filters the sequence with the predicate function.
+// If it errors, the error and the value it errored for is yielded.
+func FilterErr[V any](seq iter.Seq[V], f func(V) (bool, error)) iter.Seq2[V, error] {
+	return func(yield func(V, error) bool) {
+		for v := range seq {
+			ok, err := f(v)
+			if err != nil {
+				if !yield(v, err) {
+					return
+				}
+				continue
+			}
+			if !ok {
+				continue
+			}
+
+			if !yield(v, nil) {
+				return
+			}
+		}
+	}
+}
+
 func Filter2[K, V any](seq iter.Seq2[K, V], f func(K, V) bool) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		for k, v := range seq {
@@ -872,6 +895,38 @@ func TryFilter[K any](seq iter.Seq2[K, error], f func(K) bool) iter.Seq2[K, erro
 			}
 
 			if !f(v) {
+				continue
+			}
+
+			if !yield(v, nil) {
+				return
+			}
+		}
+	}
+}
+
+// TryFilterErr filters non-error tuples with the given predicate function.
+// For error-tuples, the filter is not applied and yield is called with the error and the value.
+// If the predicate function errors, the value it errored for and the error is yielded.
+func TryFilterErr[K any](seq iter.Seq2[K, error], f func(K) (bool, error)) iter.Seq2[K, error] {
+	return func(yield func(K, error) bool) {
+		for v, err := range seq {
+			if err != nil {
+				if !yield(v, err) {
+					return
+				}
+
+				continue
+			}
+
+			ok, err := f(v)
+			if err != nil {
+				if !yield(v, err) {
+					return
+				}
+				continue
+			}
+			if !ok {
 				continue
 			}
 
