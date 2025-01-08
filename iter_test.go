@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and Spheric contributors
+// SPDX-FileCopyrightText: 2024 Axel Christ and Spheric contributors
 // SPDX-License-Identifier: Apache-2.0
 
 package xiter_test
@@ -1563,6 +1563,14 @@ func TestOfSlice(t *testing.T) {
 	}
 }
 
+func TestOfFlattenSlice(t *testing.T) {
+	ans := ToSlice(OfFlattenSlice([][]int{{1, 2}, {3}, {}}))
+	want := []int{1, 2, 3}
+	if !slices.Equal(ans, want) {
+		t.Errorf("got %v, expected %v", ans, want)
+	}
+}
+
 func TestOfKVs(t *testing.T) {
 	ans := ToKVSlice(OfKVs[int, int](1, 2, 3, 4, 5, 6))
 	want := []any{1, 2, 3, 4, 5, 6}
@@ -1737,48 +1745,6 @@ func TestToSliceMap(t *testing.T) {
 	want := map[string][]int{"a": {1}, "b": {2}, "c": {3, 3}}
 	if !reflect.DeepEqual(ans, want) {
 		t.Errorf("got %v, expected %v", ans, want)
-	}
-}
-
-func TestTryCollect(t *testing.T) {
-	type args[K any] struct {
-		it iter.Seq2[K, error]
-	}
-	type testCase[K any] struct {
-		name    string
-		args    args[K]
-		want    []K
-		wantErr bool
-	}
-	tests := []testCase[string]{
-		{
-			name: "no error",
-			args: args[string]{
-				it: Merge[string, error](Of("foo", "bar"), Of[error](nil, nil)),
-			},
-			want:    []string{"foo", "bar"},
-			wantErr: false,
-		},
-		{
-			name: "first error wins",
-			args: args[string]{
-				it: Merge[string, error](Of("foo", "", "bar"), Of[error](nil, fmt.Errorf("error"), nil)),
-			},
-			want:    []string{"foo"},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := TryCollect(tt.args.it)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("TryCollect() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("TryCollect() got = %v, want %v", got, tt.want)
-			}
-		})
 	}
 }
 
@@ -1966,6 +1932,48 @@ func TestTryAppend(t *testing.T) {
 	}
 }
 
+func TestTryCollect(t *testing.T) {
+	type args[K any] struct {
+		it iter.Seq2[K, error]
+	}
+	type testCase[K any] struct {
+		name    string
+		args    args[K]
+		want    []K
+		wantErr bool
+	}
+	tests := []testCase[string]{
+		{
+			name: "no error",
+			args: args[string]{
+				it: Merge[string, error](Of("foo", "bar"), Of[error](nil, nil)),
+			},
+			want:    []string{"foo", "bar"},
+			wantErr: false,
+		},
+		{
+			name: "first error wins",
+			args: args[string]{
+				it: Merge[string, error](Of("foo", "", "bar"), Of[error](nil, fmt.Errorf("error"), nil)),
+			},
+			want:    []string{"foo"},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := TryCollect(tt.args.it)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TryCollect() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("TryCollect() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTryCollectWithCap(t *testing.T) {
 	var (
 		fooErr = errors.New("foo")
@@ -2041,6 +2049,114 @@ func TestTryCollectDerefWithCap(t *testing.T) {
 	}
 }
 
+func TestTryFlatAppend(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	var res []int
+	res, err := TryFlatAppend(res, Merge(Of(Of(1, 2), Of(3), Of[int]()), Of[error](nil, fooErr, nil)))
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryFlatAppend() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1, 2}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryFlatAppend() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryFlatCollect(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	res, err := TryFlatCollect(Merge(Of(Of(1, 2), Of(3), Of[int]()), Of[error](nil, fooErr, nil)))
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryFlatCollect() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1, 2}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryFlatCollect() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryFlatCollectWithCap(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	res, err := TryFlatCollectWithCap(Merge(Of(Of(1, 2), Of(3), Of[int]()), Of[error](nil, fooErr, nil)), 4)
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryFlatCollectWithCap() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1, 2}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryFlatCollectWithCap() res = %v, want %v", res, want)
+	}
+
+	wantCap := 4
+	if cap(res) != wantCap {
+		t.Errorf("TryFlatCollectWithCap() cap = %v, want %v", cap(res), wantCap)
+	}
+}
+
+func TestTryFlatSliceAppend(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	var res []int
+	res, err := TryFlatSliceAppend(res, Merge(Of([]int{1, 2}, []int{3}, ([]int)(nil)), Of[error](nil, fooErr, nil)))
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryFlatSliceAppend() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1, 2}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryFlatSliceAppend() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryFlatSliceCollect(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	res, err := TryFlatSliceCollect(Merge(Of([]int{1, 2}, []int{3}, ([]int)(nil)), Of[error](nil, fooErr, nil)))
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryFlatSliceCollect() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1, 2}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryFlatSliceCollect() res = %v, want %v", res, want)
+	}
+}
+
+func TestTryFlatSliceCollectWithCap(t *testing.T) {
+	var (
+		fooErr = errors.New("foo")
+	)
+
+	res, err := TryFlatSliceCollectWithCap(Merge(Of([]int{1, 2}, []int{3}, ([]int)(nil)), Of[error](nil, fooErr, nil)), 4)
+	if !errors.Is(err, fooErr) {
+		t.Errorf("TryFlatSliceCollectWithCap() err = %v, want %v", err, fooErr)
+	}
+
+	want := []int{1, 2}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("TryFlatSliceCollectWithCap() res = %v, want %v", res, want)
+	}
+
+	wantCap := 4
+	if cap(res) != wantCap {
+		t.Errorf("TryFlatSliceCollectWithCap() cap = %v, want %v", cap(res), wantCap)
+	}
+}
+
 func TestFilterErr(t *testing.T) {
 	var (
 		tooLargeErr = errors.New("too large")
@@ -2075,4 +2191,100 @@ func TestTryFilterErr(t *testing.T) {
 	if !reflect.DeepEqual(res, want) {
 		t.Errorf("TryFilterErr() res = %v, want %v", res, want)
 	}
+}
+
+func ExampleWrap() {
+	wrapped := Wrap(Of(1, 2, 3), func(doSeq func()) {
+		fmt.Println("Before!")
+		doSeq()
+		fmt.Println("After!")
+	})
+
+	Foreach(wrapped, func(i int) {
+		fmt.Println(i)
+	})
+	// Output:
+	// Before!
+	// 1
+	// 2
+	// 3
+	// After!
+}
+
+func ExampleBefore() {
+	wrapped := Before(Of(1, 2, 3), func() {
+		fmt.Println("Before!")
+	})
+
+	Foreach(wrapped, func(i int) {
+		fmt.Println(i)
+	})
+	// Output:
+	// Before!
+	// 1
+	// 2
+	// 3
+}
+
+func ExampleAfter() {
+	wrapped := After(Of(1, 2, 3), func() {
+		fmt.Println("After!")
+	})
+
+	Foreach(wrapped, func(i int) {
+		fmt.Println(i)
+	})
+	// Output:
+	// 1
+	// 2
+	// 3
+	// After!
+}
+
+func ExampleWrap2() {
+	wrapped := Wrap2(OfKVs[int, int](1, 1, 2, 2, 3, 3), func(doSeq func()) {
+		fmt.Println("Before!")
+		doSeq()
+		fmt.Println("After!")
+	})
+
+	Foreach2(wrapped, func(i1, i2 int) {
+		fmt.Println(i1, i2)
+	})
+	// Output:
+	// Before!
+	// 1 1
+	// 2 2
+	// 3 3
+	// After!
+}
+
+func ExampleBefore2() {
+	wrapped := Before2(OfKVs[int, int](1, 1, 2, 2, 3, 3), func() {
+		fmt.Println("Before!")
+	})
+
+	Foreach2(wrapped, func(i1, i2 int) {
+		fmt.Println(i1, i2)
+	})
+	// Output:
+	// Before!
+	// 1 1
+	// 2 2
+	// 3 3
+}
+
+func ExampleAfter2() {
+	wrapped := After2(OfKVs[int, int](1, 1, 2, 2, 3, 3), func() {
+		fmt.Println("After!")
+	})
+
+	Foreach2(wrapped, func(i1, i2 int) {
+		fmt.Println(i1, i2)
+	})
+	// Output:
+	// 1 1
+	// 2 2
+	// 3 3
+	// After!
 }

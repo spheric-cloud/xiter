@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company and Spheric contributors
+// SPDX-FileCopyrightText: 2024 Axel Christ and Spheric contributors
 // SPDX-License-Identifier: Apache-2.0
 
 package xiter
@@ -1023,7 +1023,7 @@ func TryTap[K any](seq iter.Seq2[K, error], f func(K)) iter.Seq2[K, error] {
 
 // TryAppend appends non-error values to the given slice.
 // If an error is encountered, the slice and encountered error are returned immediately.
-func TryAppend[S ~[]K, K any](s S, it iter.Seq2[K, error]) ([]K, error) {
+func TryAppend[S ~[]K, K any](s S, it iter.Seq2[K, error]) (S, error) {
 	for k, err := range it {
 		if err != nil {
 			return s, err
@@ -1050,7 +1050,7 @@ func TryCollectWithCap[K any](it iter.Seq2[K, error], cap int) ([]K, error) {
 
 // TryAppendDeref appends dereferenced non-error values to the given slice.
 // If an error is encountered, the slice and encountered error are returned immediately.
-func TryAppendDeref[S ~[]K, K any](s S, it iter.Seq2[*K, error]) ([]K, error) {
+func TryAppendDeref[S ~[]K, K any](s S, it iter.Seq2[*K, error]) (S, error) {
 	for k, err := range it {
 		if err != nil {
 			return s, err
@@ -1073,6 +1073,62 @@ func TryCollectDeref[K any](it iter.Seq2[*K, error]) ([]K, error) {
 func TryCollectDerefWithCap[K any](it iter.Seq2[*K, error], cap int) ([]K, error) {
 	res := make([]K, 0, cap)
 	return TryAppendDeref(res, it)
+}
+
+// TryFlatAppend appends non-error values to the given slice, flattening the result in the process.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryFlatAppend[S ~[]K, K any](s S, it iter.Seq2[iter.Seq[K], error]) (S, error) {
+	for ks, err := range it {
+		if err != nil {
+			return s, err
+		}
+
+		s = AppendSlice(s, ks)
+	}
+	return s, nil
+}
+
+// TryFlatCollect collects non-error values in a slice, flattening the result in the process.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryFlatCollect[K any](it iter.Seq2[iter.Seq[K], error]) ([]K, error) {
+	var res []K
+	return TryFlatAppend(res, it)
+}
+
+// TryFlatCollectWithCap collects non-error values into a slice with the given capacity,
+// flattening the result in the process.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryFlatCollectWithCap[K any](it iter.Seq2[iter.Seq[K], error], cap int) ([]K, error) {
+	res := make([]K, 0, cap)
+	return TryFlatAppend(res, it)
+}
+
+// TryFlatSliceAppend appends non-error values to the given slice, flattening the result in the process.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryFlatSliceAppend[S ~[]K, SI []K, K any](s S, it iter.Seq2[SI, error]) (S, error) {
+	for ks, err := range it {
+		if err != nil {
+			return s, err
+		}
+
+		s = append(s, ks...)
+	}
+	return s, nil
+}
+
+// TryFlatSliceCollect collects non-error values in a slice, flattening the result in the process.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryFlatSliceCollect[K any](it iter.Seq2[[]K, error]) ([]K, error) {
+	var res []K
+	return TryFlatSliceAppend(res, it)
+}
+
+// TryFlatSliceCollectWithCap collects non-error values into a slice with the given capacity,
+// flattening the result in the process.
+// If an error is encountered, the slice and encountered error are returned immediately.
+func TryFlatSliceCollectWithCap[K any](it iter.Seq2[[]K, error], cap int) ([]K, error) {
+	res := make([]K, 0, cap)
+	return TryFlatSliceAppend(res, it)
 }
 
 func Swap[K, V any](seq iter.Seq2[K, V]) iter.Seq2[V, K] {
@@ -1400,6 +1456,18 @@ func OfSlicePtr[S ~[]V, V any](s S) iter.Seq[*V] {
 		for i := range s {
 			if !yield(&s[i]) {
 				return
+			}
+		}
+	}
+}
+
+func OfFlattenSlice[SS ~[]S, S ~[]V, V any](ss SS) iter.Seq[V] {
+	return func(yield func(V) bool) {
+		for _, s := range ss {
+			for _, v := range s {
+				if !yield(v) {
+					return
+				}
 			}
 		}
 	}
@@ -1798,4 +1866,56 @@ func Drain[V any](seq iter.Seq[V]) {
 
 func Drain2[K, V any](seq iter.Seq2[K, V]) {
 	seq(func(K, V) bool { return true })
+}
+
+// Wrap wraps the given seq with the wrap function.
+// The wrap function must call the passed doSeq function to trigger the iteration.
+func Wrap[V any](seq iter.Seq[V], wrap func(doSeq func())) iter.Seq[V] {
+	return func(yield func(V) bool) {
+		wrap(func() {
+			seq(yield)
+		})
+	}
+}
+
+// Before wraps the given seq by calling the given function before the iteration.
+func Before[V any](seq iter.Seq[V], f func()) iter.Seq[V] {
+	return Wrap(seq, func(doSeq func()) {
+		f()
+		doSeq()
+	})
+}
+
+// After wraps the given seq by calling the given function after the iteration.
+func After[V any](seq iter.Seq[V], f func()) iter.Seq[V] {
+	return Wrap(seq, func(doSeq func()) {
+		doSeq()
+		f()
+	})
+}
+
+// Wrap2 wraps the given seq with the wrap function.
+// The wrap function must call the passed doSeq function to trigger the iteration.
+func Wrap2[K, V any](seq iter.Seq2[K, V], wrap func(doSeq func())) iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		wrap(func() {
+			seq(yield)
+		})
+	}
+}
+
+// Before2 wraps the given seq by calling the given function before the iteration.
+func Before2[K, V any](seq iter.Seq2[K, V], f func()) iter.Seq2[K, V] {
+	return Wrap2(seq, func(doSeq func()) {
+		f()
+		doSeq()
+	})
+}
+
+// After2 wraps the given seq by calling the given function after the iteration.
+func After2[K, V any](seq iter.Seq2[K, V], f func()) iter.Seq2[K, V] {
+	return Wrap2(seq, func(doSeq func()) {
+		doSeq()
+		f()
+	})
 }
