@@ -98,6 +98,72 @@ func EqualIgnoreOrder[V any](s1, s2 []V) bool {
 	return true
 }
 
+func TestYieldSeq(t *testing.T) {
+	var is []int
+	yield := func(i int) bool {
+		if i <= 2 {
+			is = append(is, i)
+			return true
+		}
+		return false
+	}
+	res := YieldSeq(yield, Of(1, 2, 3, 4, 5))
+	const want = false
+
+	if res != want {
+		t.Errorf("want %v, got %v", want, res)
+	}
+
+	wantIs := []int{1, 2}
+	if !slices.Equal(wantIs, is) {
+		t.Errorf("want %v, got %v", wantIs, is)
+	}
+}
+
+func TestYieldSeq2(t *testing.T) {
+	var is []int
+	yield := func(i1, i2 int) bool {
+		if i1 <= 2 {
+			is = append(is, i1, i2)
+			return true
+		}
+		return false
+	}
+	res := YieldSeq2(yield, OfKVs[int, int](1, 1, 2, 2, 3, 3, 4, 4, 5, 5))
+	const want = false
+
+	if res != want {
+		t.Errorf("want %v, got %v", want, res)
+	}
+
+	wantIs := []int{1, 1, 2, 2}
+	if !slices.Equal(wantIs, is) {
+		t.Errorf("want %v, got %v", wantIs, is)
+	}
+}
+
+func TestYieldSlice(t *testing.T) {
+	var is []int
+	yield := func(i int) bool {
+		if i <= 2 {
+			is = append(is, i)
+			return true
+		}
+		return false
+	}
+	res := YieldSlice(yield, []int{1, 2, 3, 4, 5})
+	const want = false
+
+	if res != want {
+		t.Errorf("want %v, got %v", want, res)
+	}
+
+	wantIs := []int{1, 2}
+	if !slices.Equal(wantIs, is) {
+		t.Errorf("want %v, got %v", wantIs, is)
+	}
+}
+
 func TestConcat(t *testing.T) {
 	testCases := []struct {
 		name   string

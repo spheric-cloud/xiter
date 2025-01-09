@@ -13,29 +13,65 @@ import (
 	"strings"
 )
 
+// YieldSeq yields the given seqs to the yield function, breaking and returning if any yield returned false.
+func YieldSeq[V any](yield func(V) bool, seqs ...iter.Seq[V]) bool {
+	for _, seq := range seqs {
+		for v := range seq {
+			if !yield(v) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// YieldSeq2 yields the given seqs to the yield function, breaking and returning if any yield returned false.
+func YieldSeq2[K, V any](yield func(K, V) bool, seqs ...iter.Seq2[K, V]) bool {
+	for _, seq := range seqs {
+		for k, v := range seq {
+			if !yield(k, v) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// YieldSlice yields the given slice to the yield function, breaking and returning if any yield returned false.
+func YieldSlice[S ~[]V, V any](yield func(V) bool, ss ...S) bool {
+	for _, s := range ss {
+		for _, v := range s {
+			if !yield(v) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// YieldMap yields the given map to the yield function, breaking and returning if any yield returned false.
+func YieldMap[M ~map[K]V, K comparable, V any](yield func(K, V) bool, ms ...M) bool {
+	for _, m := range ms {
+		for k, v := range m {
+			if !yield(k, v) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // Concat concatenates multiple Seq into a single Seq.
 func Concat[V any](seqs ...iter.Seq[V]) iter.Seq[V] {
 	return func(yield func(V) bool) {
-		for _, seq := range seqs {
-			for v := range seq {
-				if !yield(v) {
-					return
-				}
-			}
-		}
+		YieldSeq(yield, seqs...)
 	}
 }
 
 // Concat2 concatenates multiple Seq2 into a single Seq2.
 func Concat2[K, V any](seqs ...iter.Seq2[K, V]) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
-		for _, seq := range seqs {
-			for k, v := range seq {
-				if !yield(k, v) {
-					return
-				}
-			}
-		}
+		YieldSeq2(yield, seqs...)
 	}
 }
 
@@ -1418,11 +1454,7 @@ func OfKVs[K, V any](kvs ...any) iter.Seq2[K, V] {
 
 func OfMap[M ~map[K]V, K comparable, V any](m M) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
-		for k, v := range m {
-			if !yield(k, v) {
-				return
-			}
-		}
+		YieldMap(yield, m)
 	}
 }
 
