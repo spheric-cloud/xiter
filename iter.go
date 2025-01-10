@@ -853,6 +853,40 @@ func Reduce2[Sum, K, V any](sum Sum, seq iter.Seq2[K, V], f func(Sum, K, V) Sum)
 	return sum
 }
 
+// cast is a 'primitive' that casts In to Out. It panics if the cast fails.
+func cast[Out, In any](in In) Out {
+	return any(in).(Out)
+}
+
+// castOrError is a 'primitive' that casts In to Out if possible. It returns an error if it is not possible to cast.
+func castOrError[Out, In any](in In) (Out, error) {
+	out, ok := any(in).(Out)
+	if !ok {
+		return out, fmt.Errorf("expected %T but got %T", out, in)
+	}
+	return out, nil
+}
+
+// Cast casts In values to Out values. It panics if any cast fails.
+func Cast[Out, In any](seq iter.Seq[In]) iter.Seq[Out] {
+	return Map(seq, cast[Out, In])
+}
+
+// CastOrError casts In values to Out values if possible, yielding errors if the cast is not possible.
+func CastOrError[Out, In any](seq iter.Seq[In]) iter.Seq2[Out, error] {
+	return MapErr(seq, castOrError[Out, In])
+}
+
+// TryCast casts non-error In values to Out values. It panics if any cast fails.
+func TryCast[Out, In any](seq iter.Seq2[In, error]) iter.Seq2[Out, error] {
+	return TryMap(seq, cast[Out, In])
+}
+
+// TryCastOrError casts non-error In values to Out values. It panics if any cast fails.
+func TryCastOrError[Out, In any](seq iter.Seq2[In, error]) iter.Seq2[Out, error] {
+	return TryMapErr(seq, castOrError[Out, In])
+}
+
 func Keys[K, V any](seq iter.Seq2[K, V]) iter.Seq[K] {
 	return func(yield func(K) bool) {
 		for k, _ := range seq {
@@ -895,6 +929,16 @@ func MapLower[KIn, VIn, VOut any](seq iter.Seq2[KIn, VIn], f func(KIn, VIn) VOut
 
 func MapErr[In, Out any](seq iter.Seq[In], f func(In) (Out, error)) iter.Seq2[Out, error] {
 	return MapLift[In, Out, error](seq, f)
+}
+
+// LiftSuccess returns an iter.Seq2[V, error] with all error values as nil.
+func LiftSuccess[V any](seq iter.Seq[V]) iter.Seq2[V, error] {
+	return MapErr(seq, func(v V) (V, error) { return v, nil })
+}
+
+// LiftFailure returns an iter.Seq2[V, error] with all V values as zero.
+func LiftFailure[V any](seq iter.Seq[error]) iter.Seq2[V, error] {
+	return MapErr(seq, func(err error) (V, error) { var zero V; return zero, err })
 }
 
 // TryMapErr applies the transformation function f to each non-error tuple of the given sequence.
