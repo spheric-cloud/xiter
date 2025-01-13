@@ -18,6 +18,11 @@ import (
 	. "spheric.cloud/xiter"
 )
 
+type Pair[K any, V any] struct {
+	K K
+	V V
+}
+
 func AbsMod(n int, cap int) int {
 	return Abs(n) % cap
 }
@@ -1972,12 +1977,22 @@ func TestTryTap(t *testing.T) {
 		fooErr = errors.New("foo")
 	)
 
-	var res []int
-	Drain2(TryTap(Merge(Of(1, 2, 3), Of[error](nil, fooErr, nil)), func(i int) { res = append(res, i) }))
+	var (
+		tapped []int
+		res    []Pair[int, error]
+	)
+	for v, err := range TryTap(OfKV[int, error]().K(1).P(2, fooErr).K(3).Seq(), func(i int) { tapped = append(tapped, i) }) {
+		res = append(res, Pair[int, error]{v, err})
+	}
 
-	want := []int{1, 3}
-	if !reflect.DeepEqual(res, want) {
-		t.Errorf("TryTap() res = %v, want %v", res, want)
+	wantTapped := []int{1, 3}
+	if !slices.Equal(tapped, wantTapped) {
+		t.Errorf("TryTap() tapped = %v, wantTapped %v", tapped, wantTapped)
+	}
+
+	wantRes := []Pair[int, error]{{K: 1}, {K: 2, V: fooErr}, {K: 3}}
+	if !slices.Equal(res, wantRes) {
+		t.Errorf("TryTap() res = %v, want %v", res, wantRes)
 	}
 }
 

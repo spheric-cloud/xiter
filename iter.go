@@ -1089,14 +1089,12 @@ func TryFlatmapErr[In, Out any](seq iter.Seq2[In, error], f func(In) iter.Seq2[O
 func TryTap[K any](seq iter.Seq2[K, error], f func(K)) iter.Seq2[K, error] {
 	return func(yield func(K, error) bool) {
 		for v, err := range seq {
-			if err != nil {
-				if !yield(v, err) {
-					return
-				}
-				continue
+			if err == nil {
+				f(v)
 			}
-
-			f(v)
+			if !yield(v, err) {
+				return
+			}
 		}
 	}
 }
@@ -1494,6 +1492,52 @@ func Of[V any](vs ...V) iter.Seq[V] {
 
 func OfKVs[K, V any](kvs ...any) iter.Seq2[K, V] {
 	return OfKVSlice[K, V](kvs)
+}
+
+type pair[K, V any] struct {
+	K K
+	V V
+}
+
+type KVSeqBuilder[K, V any] struct {
+	kvs []pair[K, V]
+}
+
+func (b *KVSeqBuilder[K, V]) P(k K, v V) *KVSeqBuilder[K, V] {
+	b.kvs = append(b.kvs, pair[K, V]{k, v})
+	return b
+}
+
+func (b *KVSeqBuilder[K, V]) K(ks ...K) *KVSeqBuilder[K, V] {
+	for _, k := range ks {
+		var zeroV V
+		b.P(k, zeroV)
+	}
+	return b
+}
+
+func (b *KVSeqBuilder[K, V]) V(vs ...V) *KVSeqBuilder[K, V] {
+	for _, v := range vs {
+		var zeroV K
+		b.P(zeroV, v)
+	}
+	return b
+}
+
+func (b *KVSeqBuilder[K, V]) Seq() iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		for _, kv := range b.kvs {
+			if !yield(kv.K, kv.V) {
+				return
+			}
+		}
+	}
+}
+
+// OfKV offers a simplistic builder for iter.Seq2[K, V].
+// Simply add some elements via the addition functions and call KVSeqBuilder.Seq to obtain the Seq.
+func OfKV[K, V any]() *KVSeqBuilder[K, V] {
+	return &KVSeqBuilder[K, V]{}
 }
 
 func OfMap[M ~map[K]V, K comparable, V any](m M) iter.Seq2[K, V] {
